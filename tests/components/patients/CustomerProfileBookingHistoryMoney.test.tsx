@@ -236,6 +236,23 @@ describe('Patient profile -> Booking History money columns (DEC-119)', () => {
     expect(screen.getByTestId('history-payment').textContent).toBe(t.paymentStatusLabels.partial);
   });
 
+  // DEC-121: the card read the stored spent_amount (0) and ignored the figure worked out from the bookings.
+  it('Financial summary: Total Spend shows what was worked out from the bookings when the stored column is 0', () => {
+    const profile = { id: 'cust-1', name: 'Zara Ahmed', mobile: '01012345678', phone: '01012345678', spent_amount: 0, spent: 2700 };
+    render(<CustomerProfileDrawer {...(buildProps({ viewingCustomerProfile: profile }) as any)} />);
+    const t = adminTranslations.en.patients.customerProfileDrawer;
+    const card = screen.getByText(t.totalSpend).closest('div[class*="rounded-2xl"]') as HTMLElement;
+    expect(card.textContent).toContain('2,700');
+  });
+
+  it('Financial summary: a larger stored Total Spend is kept', () => {
+    const profile = { id: 'cust-1', name: 'Zara Ahmed', mobile: '01012345678', phone: '01012345678', spent_amount: 5000, spent: 2700 };
+    render(<CustomerProfileDrawer {...(buildProps({ viewingCustomerProfile: profile }) as any)} />);
+    const t = adminTranslations.en.patients.customerProfileDrawer;
+    const card = screen.getByText(t.totalSpend).closest('div[class*="rounded-2xl"]') as HTMLElement;
+    expect(card.textContent).toContain('5,000');
+  });
+
   it('shows the empty state across all nine columns', () => {
     const { container } = render(<CustomerProfileDrawer {...(buildProps() as any)} />);
     const td = container.querySelector('tbody td[colspan]');
