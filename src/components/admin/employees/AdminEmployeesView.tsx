@@ -94,6 +94,7 @@ interface AdminEmployeesViewProps {
   session: any;
   adminDbId?: string;
   adminEmail?: string;
+  adminRole?: string | null;
   fetchHrAttendance: () => Promise<void> | void;
   handleDeleteEmployee: (id: string) => Promise<void> | void;
   handleToggleEmployeeActive: (id: string, makeActive: boolean) => Promise<void> | void;
@@ -141,6 +142,7 @@ export default function AdminEmployeesView({
   session,
   adminDbId,
   adminEmail,
+  adminRole,
   fetchHrAttendance,
   handleDeleteEmployee,
   handleToggleEmployeeActive,
@@ -166,6 +168,54 @@ export default function AdminEmployeesView({
   const [newEmployeeShift, setNewEmployeeShift] = useState("Day");
   const [newEmployeeShiftStart, setNewEmployeeShiftStart] = useState("09:00");
   const [newEmployeeShiftEnd, setNewEmployeeShiftEnd] = useState("17:00");
+
+  // Superadmin-only: set a brand new password for an employee whose login no longer works.
+  // See PATCH /api/employees (newPassword) — the role check is enforced there, this is UI only.
+  const [resetPasswordTarget, setResetPasswordTarget] = useState<any | null>(null);
+  const [resetPasswordValue, setResetPasswordValue] = useState("");
+  const [showResetPasswordValue, setShowResetPasswordValue] = useState(false);
+  const [resetPasswordSaving, setResetPasswordSaving] = useState(false);
+  const STRONG_PASSWORD_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+
+  async function handleConfirmResetPassword() {
+    if (!resetPasswordTarget) return;
+    if (!STRONG_PASSWORD_RE.test(resetPasswordValue)) {
+      alert(
+        lang === "ar"
+          ? "لازم الباسورد يكون 8 حروف على الأقل ويحتوي على حرف كبير وحرف صغير ورقم ورمز."
+          : "Password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number, and a symbol."
+      );
+      return;
+    }
+    setResetPasswordSaving(true);
+    try {
+      const res = await fetch("/api/employees", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token || ""}`,
+        },
+        body: JSON.stringify({ id: resetPasswordTarget.id, newPassword: resetPasswordValue }),
+      });
+      if (res.ok) {
+        alert(
+          lang === "ar"
+            ? `تم تعيين باسورد جديد لـ ${resetPasswordTarget.name || resetPasswordTarget.email} بنجاح.`
+            : `New password set for ${resetPasswordTarget.name || resetPasswordTarget.email}.`
+        );
+        setResetPasswordTarget(null);
+        setResetPasswordValue("");
+        setShowResetPasswordValue(false);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || (lang === "ar" ? "فشل تعيين الباسورد الجديد." : "Failed to set the new password."));
+      }
+    } catch (err: any) {
+      alert((lang === "ar" ? "خطأ أثناء تعيين الباسورد: " : "Error setting the password: ") + err.message);
+    } finally {
+      setResetPasswordSaving(false);
+    }
+  }
 
   const parseTime12Hour = (time12: string): string => {
     if (!time12) return "09:00";
@@ -1324,6 +1374,16 @@ export default function AdminEmployeesView({
                                 <Pencil size={13} />
                               </button>
                             )}
+                            {adminRole === "superadmin" && (
+                              <button
+                                type="button"
+                                onClick={() => { setResetPasswordTarget(emp); setResetPasswordValue(""); setShowResetPasswordValue(false); }}
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[var(--cr-primary)]/15 text-[var(--color-brand-secondary)] transition hover:border-[var(--cr-accent)] hover:text-[var(--cr-primary)]"
+                                title={lang === "ar" ? "تعيين باسورد جديد" : "Set New Password"}
+                              >
+                                <Lock size={13} />
+                              </button>
+                            )}
                             {emp.is_active !== false && !emp.email_confirmed_at && (!hasPermission || hasPermission("employees.action_resend_invite")) && (
                               <button
                                 type="button"
@@ -1457,6 +1517,15 @@ export default function AdminEmployeesView({
                           className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-1.5 text-xs font-semibold text-[var(--cr-primary)] transition hover:border-[var(--cr-accent)] hover:bg-[var(--color-brand-light)]"
                         >
                           <Pencil size={13} /> {t.actions.editEmployee}
+                        </button>
+                      )}
+                      {adminRole === "superadmin" && (
+                        <button
+                          type="button"
+                          onClick={() => { setResetPasswordTarget(emp); setResetPasswordValue(""); setShowResetPasswordValue(false); }}
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-1.5 text-xs font-semibold text-[var(--cr-primary)] transition hover:border-[var(--cr-accent)] hover:bg-[var(--color-brand-light)]"
+                        >
+                          <Lock size={13} /> {lang === "ar" ? "باسورد جديد" : "New Password"}
                         </button>
                       )}
                       {!emp.email_confirmed_at && (!hasPermission || hasPermission("employees.action_resend_invite")) && (
@@ -3546,6 +3615,86 @@ export default function AdminEmployeesView({
                 )}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Superadmin: Set New Password modal */}
+      {resetPasswordTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-[var(--cr-primary)]/15 space-y-5 relative">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5 text-[#1E3A2B]">
+                <div className="h-9 w-9 rounded-2xl bg-[var(--color-brand-tint)] flex items-center justify-center text-[var(--cr-primary)] shrink-0">
+                  <Lock size={18} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-[var(--cr-dark)]">
+                    {lang === "ar" ? "تعيين باسورد جديد" : "Set New Password"}
+                  </h3>
+                  <p className="text-[11px] text-[var(--color-brand-secondary)] font-medium">
+                    {resetPasswordTarget.name || resetPasswordTarget.email}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => { if (!resetPasswordSaving) { setResetPasswordTarget(null); setResetPasswordValue(""); } }}
+                disabled={resetPasswordSaving}
+                className="h-8 w-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-500 transition"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-[var(--color-brand-secondary)]">
+                {lang === "ar" ? "الباسورد الجديد" : "New Password"}
+              </label>
+              <div className="relative">
+                <input
+                  type={showResetPasswordValue ? "text" : "password"}
+                  value={resetPasswordValue}
+                  onChange={(e) => setResetPasswordValue(e.target.value)}
+                  autoFocus
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2.5 pr-10 text-sm font-medium text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)]"
+                  placeholder={lang === "ar" ? "اكتب الباسورد الجديد" : "Type the new password"}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowResetPasswordValue((v) => !v)}
+                  className="absolute inset-y-0 right-2.5 flex items-center text-[var(--color-brand-secondary)]"
+                  tabIndex={-1}
+                >
+                  {showResetPasswordValue ? <Eye size={15} /> : <Lock size={14} />}
+                </button>
+              </div>
+              <p className="text-[11px] text-[var(--color-brand-secondary)]">
+                {lang === "ar"
+                  ? "8 حروف على الأقل، وفيها حرف كبير وحرف صغير ورقم ورمز."
+                  : "At least 8 characters, with an uppercase letter, a lowercase letter, a number, and a symbol."}
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-[var(--cr-primary)]/10">
+              <button
+                type="button"
+                onClick={() => { setResetPasswordTarget(null); setResetPasswordValue(""); }}
+                disabled={resetPasswordSaving}
+                className="px-4 py-2.5 rounded-xl border border-[var(--cr-primary)]/20 bg-white font-bold text-xs text-[var(--cr-dark)] hover:bg-[var(--color-brand-light)] transition disabled:opacity-50"
+              >
+                {lang === "ar" ? "إلغاء" : "Cancel"}
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmResetPassword}
+                disabled={resetPasswordSaving || !resetPasswordValue}
+                className="px-5 py-2.5 rounded-xl bg-[#1E3A2B] text-white font-extrabold text-xs hover:bg-[#162C20] transition disabled:opacity-50 flex items-center gap-2"
+              >
+                {resetPasswordSaving ? <Loader2 size={14} className="animate-spin" /> : null}
+                {lang === "ar" ? "تأكيد" : "Confirm"}
+              </button>
+            </div>
           </div>
         </div>
       )}
