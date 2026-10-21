@@ -26,12 +26,12 @@
 --      straight from the browser (the staff profile, attendance and the doctor-to-provider match).
 --      Policies that are limited to the service_role role are never touched.
 --
--- NOT DONE HERE (follow-up, needs app changes first)
---   Move those browser reads (employee_accounts, hr_attendance in UserProfileView.tsx and
---   DoctorAccountView.tsx) to authenticated API routes, then close the last two read policies:
+-- FOLLOW-UP (the app side is done: UserProfileView.tsx and DoctorAccountView.tsx now read through
+--   /api/profile, /api/profile/attendance and /api/profile/payroll, RISK-128)
+--   Once that code is deployed to the environment, close the last two read policies:
 --     DROP POLICY IF EXISTS "Allow public read access to employee_accounts" ON public.employee_accounts;
 --     DROP POLICY IF EXISTS "Allow public read access to hr_attendance"     ON public.hr_attendance;
---   Running those before the screens are moved would blank the staff profile screen.
+--   Running them before the new code is live would blank the staff profile screen.
 --
 -- SIDE EFFECT: realtime events for prescriptions stop reaching the browser (they were only delivered
 -- because of the open read policy). The Bookings screen already re-reads follow-ups every 15 s and on the
