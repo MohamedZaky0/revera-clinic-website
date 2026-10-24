@@ -3776,3 +3776,51 @@ Investigation revealed:
 
 **Not done / limits:** switching the account back on also turns the doctor back on, even if the doctor had been deactivated separately on the Doctors screen before; do that again if needed. Deactivating a doctor on the Doctors screen (the status toggle) does not switch their account off; only the soft delete does. Bookings already made with that doctor are untouched.
 
+---
+
+## DEC-119: Error Monitoring Via Sentry (`@sentry/nextjs`), Wired For Production
+
+**Date:** 2026-10-24
+**Status:** Decided & implemented (one manual step outstanding — see Not done)
+
+**Context:** the app had no error monitoring — a production error was only visible if a
+user reported it. Owner set up the Sentry org (`iox-solutions`) and asked for it wired
+into this app for the production environment.
+
+**Decision:**
+1. New Sentry project `revera-website-frontend` under org `iox-solutions`
+   (https://iox-solutions.sentry.io/projects/revera-website-frontend/), platform
+   `javascript-nextjs`.
+2. `@sentry/nextjs@^11.9.0` installed. Standard baseline enabled: error monitoring +
+   tracing (10% sampled in production, 100% in dev) + session replay (10% of sessions,
+   100% of sessions with an error) — logs are on by default in this SDK version
+   (`enableLogs` was removed upstream; see Not done).
+3. Config files follow the `src/` layout already used by `middleware.ts`:
+   `src/instrumentation-client.ts` (browser), `src/sentry.server.config.ts` (Node),
+   `src/sentry.edge.config.ts` (Edge), `src/instrumentation.ts` (runtime dispatch +
+   `onRequestError` for automatic server-error capture), `src/app/global-error.tsx`
+   (root render errors, App Router).
+4. `next.config.ts` wrapped with `withSentryConfig` from **`@sentry/nextjs/config`** —
+   not the package root; in this SDK version `withSentryConfig` is a build-time-only
+   subpath export, and importing it from `@sentry/nextjs` throws
+   `withSentryConfig is not a function` at `next dev`/`next build` time. Also sets
+   `tunnelRoute: "/monitoring"` (ad-blocker bypass); `middleware.ts`'s matcher is scoped
+   to `/api/:path*` only, so it doesn't intercept that route.
+5. Verified end to end in dev: a real thrown error in an API route landed in Sentry
+   ([REVERA-WEBSITE-FRONTEND-1](https://iox-solutions.sentry.io/issues/REVERA-WEBSITE-FRONTEND-1)),
+   frame resolved to real source (`src/app/api/sentry-test-error/route.ts:2:9`), release
+   tag auto-populated from the git commit SHA. Checklist:
+   `ai_docs/manual_tests/SENTRY_SETUP_MANUAL_TESTS.md`.
+6. Production env vars set on Vercel (`revera-clinic-website` project, production
+   target only): `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_DSN`, `SENTRY_ORG`, `SENTRY_PROJECT`,
+   and `SENTRY_AUTH_TOKEN` (an Organization Token the owner generated in Sentry's UI —
+   the Sentry MCP has no tool to mint API tokens, by design). The DSNs/org/project
+   values are public identifiers; the auth token is the one real secret, stored as
+   type `sensitive`.
+
+**Not done / limits:** no alert rules or uptime monitors were set up — not asked for.
+Production source-map upload (the `SENTRY_AUTH_TOKEN` wiring) has not yet been verified
+against a real production build/deploy — it's configured but unproven until the next
+deploy ships and a production error is checked against
+`ai_docs/manual_tests/SENTRY_SETUP_MANUAL_TESTS.md`.
+
