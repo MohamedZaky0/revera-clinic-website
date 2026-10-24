@@ -3917,3 +3917,16 @@ into this app for the production environment.
 **What it never contains:** tokens, e-mail addresses, patient data. Only event names, yes/no flags, a time, a three-letter tab tag, and the short text of a refresh error.
 
 **Not done on purpose:** no server-side log yet. While the session is dead the server rejects requests, so a server log would have to be sent after the next successful login; that is a possible follow-up (a superadmin "sign-in problems" list) once the trail shows what kind of problem this is.
+
+## DEC-125: Warn When A Computer's Clock Is Out Of Step With The Server, And Stop A Refresh Burst From Becoming A Request Burst
+
+**Date:** 2026-10-24 · **Status:** Done on dev; not yet on production · **Related:** RISK-130, DEC-124
+
+**Decision:**
+1. **Warning.** The admin compares this computer's clock with the server's using the `Date` header of the `/api/auth/me` answer (`src/lib/clockSkew.ts`). If they differ by 5 minutes or more, an amber banner at the top of the admin (`src/components/admin/ClockSkewBanner.tsx`, English and Arabic) says by how much and what to do (Windows: Date & time, turn on "Set time automatically", Sync now, do not set the time by hand, reload). The measurement is also written into the DEC-124 trail.
+2. **Shared token lookup.** `getAuthHeaders()` (`src/lib/authHeaders.ts`) lets concurrent callers share one `getSession()` and reuses its answer for 15 seconds. The reused token is replaced on `TOKEN_REFRESHED` and forgotten on any other auth event (sign-in, sign-out), so a different person signing in is never sent with the previous token.
+3. **Fewer verifications.** The admin page no longer re-calls `/api/auth/me` for a `TOKEN_REFRESHED` of a login it verified within the last minute. The role/inactive check still runs on the first refresh after a minute, so the hourly re-check of DEC-117 is unchanged.
+
+**Why:** RISK-130. A clock about an hour ahead made every token look expired, so refreshes (and everything that triggered them) arrived several per second until Supabase answered 429. The warning is the real remedy, because only the person at that computer can fix its clock; 2 and 3 only soften the damage.
+
+**Limits:** several screens still call `supabase.auth.getSession()` directly instead of `getAuthHeaders()`; they were not changed. A computer whose clock is wrong still refreshes about every 30 seconds through Supabase's own timer, which is well under the limit.
