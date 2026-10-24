@@ -5603,3 +5603,15 @@ See `PROPOSALS.md` for:
 
 **Open:** the same patient also has a booking with no service (shown as "Service #null") and 2,820 outstanding; whether that is real or a data entry problem was not checked. Outstanding on the card (2,820) vs the sum of the rows (2,920) is the stored-value drift described in DEC-121.
 
+## RISK-130: One Reception Laptop Is Sent To The Login Page While Choosing A Date In Add Previous Booking (OPEN, DIAGNOSTIC ADDED)
+
+**Manual test checklist:** `ai_docs/manual_tests/SESSION_ENDED_TRAIL_MANUAL_TESTS.md`
+
+**Severity:** Medium (loses the form being filled in) · **Type:** Session / authentication
+**Found:** 2026-10-24, reported by the owner with a phone video of the clinic laptop: the "Staff Authentication Required ... Redirecting" card for under a second, then /login with "Your session ended unexpectedly" (the `session_ended` reason). It happens on that laptop only; the laptop's date and time are correct.
+
+**What is known:** the form makes no network call when the date changes, so the date is not itself the trigger. `session_ended` means Supabase reported the login as gone (`SIGNED_OUT`) without anyone pressing Logout, and the one silent recovery attempt (RISK-114) did not bring it back.
+
+**Suspected, not confirmed:** (1) the same staff login open in more than one tab or browser on that laptop (refresh-token rotation collision, RISK-114); (2) a session time-box or inactivity limit on the production Supabase project (Authentication -> Sessions; the local `config.toml` has both off, which says nothing about production); (3) the laptop sleeping or losing the network.
+
+**Done:** DEC-124 trail printed on the login page. **Open:** read the trail after the next occurrence and fix the real cause.

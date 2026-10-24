@@ -150,13 +150,17 @@ function safeStorage(storage?: StorageLike): StorageLike | null {
   }
 }
 
-export function recordLogoutReason(prefix: string, reason: LogoutReason, opts: { onlyIfEmpty?: boolean; storage?: StorageLike } = {}): void {
+export function recordLogoutReason(
+  prefix: string,
+  reason: LogoutReason,
+  opts: { onlyIfEmpty?: boolean; storage?: StorageLike; detail?: string } = {}
+): void {
   const store = safeStorage(opts.storage);
   if (!store) return;
   try {
     const key = `${prefix}${LOGOUT_REASON_KEY_SUFFIX}`;
     if (opts.onlyIfEmpty && store.getItem(key)) return;
-    store.setItem(key, JSON.stringify({ reason, at: Date.now() }));
+    store.setItem(key, JSON.stringify({ reason, at: Date.now(), ...(opts.detail ? { detail: opts.detail.slice(0, 2000) } : {}) }));
   } catch {
     /* storage blocked: the notice is a convenience only */
   }
@@ -170,8 +174,8 @@ export function clearLogoutReason(prefix: string, storage?: StorageLike): void {
   }
 }
 
-/** Reads and removes the stored reason; ignores anything older than a day. */
-export function consumeLogoutReason(prefix: string, storage?: StorageLike): LogoutReason | null {
+/** Reads and removes the stored reason (and the technical detail kept with it); ignores anything older than a day. */
+export function consumeLogoutNotice(prefix: string, storage?: StorageLike): { reason: LogoutReason; detail?: string } | null {
   const store = safeStorage(storage);
   if (!store) return null;
   try {
@@ -181,9 +185,56 @@ export function consumeLogoutReason(prefix: string, storage?: StorageLike): Logo
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed.at !== 'number' || Date.now() - parsed.at > 24 * 3600 * 1000) return null;
-    return ['inactivity', 'session_rejected', 'wrong_portal', 'session_ended', 'account_inactive'].includes(parsed.reason) ? parsed.reason : null;
+    if (!['inactivity', 'session_rejected', 'wrong_portal', 'session_ended', 'account_inactive'].includes(parsed.reason)) return null;
+    return { reason: parsed.reason, ...(typeof parsed.detail === 'string' && parsed.detail ? { detail: parsed.detail } : {}) };
   } catch {
     return null;
+  }
+}
+
+export function consumeLogoutReason(prefix: string, storage?: StorageLike): LogoutReason | null {
+  return consumeLogoutNotice(prefix, storage)?.reason ?? null;
+}
+
+/**
+ * A short, shared trail of what this browser's auth session went through (events Supabase fired,
+ * whether the tab was visible, the outcome of a recovery attempt). "Your session ended unexpectedly"
+ * says nothing about WHY on a computer where it keeps happening; the trail is written into the
+ * login-page notice when that happens, so the cause can be read off the screen instead of guessed.
+ * It lives in localStorage so every open tab of the browser writes to the same list. It never holds
+ * tokens, emails or any patient data - only event names, yes/no flags and error messages.
+ */
+const AUTH_TRAIL_KEY_SUFFIX = '_auth_trail';
+const AUTH_TRAIL_MAX = 15;
+
+export function readAuthTrail(prefix: string, storage?: StorageLike): string[] {
+  try {
+    const raw = safeStorage(storage)?.getItem(`${prefix}${AUTH_TRAIL_KEY_SUFFIX}`);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((x: unknown): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+export function pushAuthTrail(prefix: string, text: string, opts: { storage?: StorageLike; now?: number } = {}): void {
+  try {
+    const store = safeStorage(opts.storage);
+    if (!store) return;
+    const at = new Date(opts.now ?? Date.now());
+    const hhmmss = [at.getHours(), at.getMinutes(), at.getSeconds()].map((n) => String(n).padStart(2, '0')).join(':');
+    const next = [...readAuthTrail(prefix, store), `${hhmmss} ${text}`.slice(0, 160)].slice(-AUTH_TRAIL_MAX);
+    store.setItem(`${prefix}${AUTH_TRAIL_KEY_SUFFIX}`, JSON.stringify(next));
+  } catch {
+    /* the trail is a convenience only */
+  }
+}
+
+export function clearAuthTrail(prefix: string, storage?: StorageLike): void {
+  try {
+    safeStorage(storage)?.removeItem(`${prefix}${AUTH_TRAIL_KEY_SUFFIX}`);
+  } catch {
+    /* ignore */
   }
 }
 

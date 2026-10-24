@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { getRoleSlug, getRoleDisplayName } from "@/lib/roleUtils";
 import { Lock, Mail, Eye, EyeOff, ShieldCheck, ArrowLeft } from "lucide-react";
 import { CLIENT } from "@/config/client";
-import { consumeLogoutReason, describeLogoutReason } from "@/lib/authRecovery";
+import { consumeLogoutNotice, describeLogoutReason, clearAuthTrail } from "@/lib/authRecovery";
 
 export default function UnifiedStaffLoginPage() {
   const router = useRouter();
@@ -19,11 +19,16 @@ export default function UnifiedStaffLoginPage() {
   const [checkingSession, setCheckingSession] = useState(true);
   const [redirectingTo, setRedirectingTo] = useState<string | null>(null);
   const [signedOutNotice, setSignedOutNotice] = useState<string | null>(null);
+  const [signedOutDetail, setSignedOutDetail] = useState<string | null>(null);
 
   // Why the admin shell last sent this person here without a Logout click (RISK-117), shown once.
   useEffect(() => {
-    const reason = consumeLogoutReason(CLIENT.storagePrefix);
-    if (reason) setSignedOutNotice(describeLogoutReason(reason));
+    const notice = consumeLogoutNotice(CLIENT.storagePrefix);
+    if (notice) {
+      setSignedOutNotice(describeLogoutReason(notice.reason));
+      setSignedOutDetail(notice.detail ?? null);
+    }
+    clearAuthTrail(CLIENT.storagePrefix);
   }, []);
 
   // Check if staff member already has an active authenticated session
@@ -276,6 +281,9 @@ export default function UnifiedStaffLoginPage() {
             {signedOutNotice && !error && (
               <div role="status" className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3 leading-relaxed">
                 {signedOutNotice}
+                {signedOutDetail && (
+                  <pre data-testid="signed-out-detail" className="mt-2 whitespace-pre-wrap break-words font-mono text-[10px] leading-snug text-amber-900/80 select-text">{signedOutDetail}</pre>
+                )}
               </div>
             )}
 

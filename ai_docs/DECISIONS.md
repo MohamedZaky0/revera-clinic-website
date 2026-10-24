@@ -3906,3 +3906,14 @@ into this app for the production environment.
 
 **Not done / limits:** no alert rules or uptime monitors were set up — not asked for.
 
+## DEC-124: When A Login Ends Unexpectedly, The Login Page Shows What Happened (Diagnostic Trail)
+
+**Date:** 2026-10-24 · **Status:** Done on dev; not yet on production · **Related:** RISK-114, RISK-117, RISK-130
+
+**Decision:** keep a short trail of the browser's auth events (at most the last 15: the event Supabase fired, whether the tab was visible, whether the browser was offline, and the outcome of a recovery attempt, with a short tag per tab) in `localStorage` (`<prefix>_auth_trail`, helpers `pushAuthTrail` / `readAuthTrail` / `clearAuthTrail` in `src/lib/authRecovery.ts`). When the admin shell sends the person to /login only because the session vanished (`session_ended`), that trail is stored with the reason and printed under the notice on the login page (`recordLogoutReason(..., { detail })`, `consumeLogoutNotice`).
+
+**Why:** the clinic reception laptop, and only that laptop, was sent to /login while choosing a date in Add Previous Booking. The notice only said "Your session ended unexpectedly"; the clock, the form and the idle timer were ruled out from the code, and the remaining causes (a second tab or browser using the same login, a server-side session limit, the laptop sleeping or losing the network) cannot be told apart without seeing what the browser went through. The trail makes the cause readable from one screenshot of the login page.
+
+**What it never contains:** tokens, e-mail addresses, patient data. Only event names, yes/no flags, a time, a three-letter tab tag, and the short text of a refresh error.
+
+**Not done on purpose:** no server-side log yet. While the session is dead the server rejects requests, so a server log would have to be sent after the next successful login; that is a possible follow-up (a superadmin "sign-in problems" list) once the trail shows what kind of problem this is.
