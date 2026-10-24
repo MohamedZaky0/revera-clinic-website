@@ -3885,9 +3885,15 @@ into this app for the production environment.
    values are public identifiers; the auth token is the one real secret, stored as
    type `sensitive`.
 
+**Verified in production (2026-10-24):** a throwaway route was deployed to `main`,
+hit once, and removed in a follow-up commit. The resulting event
+([REVERA-WEBSITE-FRONTEND-2](https://iox-solutions.sentry.io/issues/REVERA-WEBSITE-FRONTEND-2))
+confirmed `environment: production`, `release` matching the deploy commit SHA, and a
+frame resolved to real source (`src/app/api/sentry-test-error/route.ts:2:13`) — this was
+a server-route error, so it confirms server-side capture and release tagging on a real
+prod deploy, not specifically client-bundle source-map resolution (Node/server output
+isn't minified the same way browser bundles are). Client-side source maps are still
+unverified against production.
+
 **Not done / limits:** no alert rules or uptime monitors were set up — not asked for.
-Production source-map upload (the `SENTRY_AUTH_TOKEN` wiring) has not yet been verified
-against a real production build/deploy — it's configured but unproven until the next
-deploy ships and a production error is checked against
-`ai_docs/manual_tests/SENTRY_SETUP_MANUAL_TESTS.md`.
 
