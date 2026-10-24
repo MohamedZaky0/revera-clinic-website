@@ -3885,15 +3885,24 @@ into this app for the production environment.
    values are public identifiers; the auth token is the one real secret, stored as
    type `sensitive`.
 
-**Verified in production (2026-10-24):** a throwaway route was deployed to `main`,
-hit once, and removed in a follow-up commit. The resulting event
-([REVERA-WEBSITE-FRONTEND-2](https://iox-solutions.sentry.io/issues/REVERA-WEBSITE-FRONTEND-2))
-confirmed `environment: production`, `release` matching the deploy commit SHA, and a
-frame resolved to real source (`src/app/api/sentry-test-error/route.ts:2:13`) — this was
-a server-route error, so it confirms server-side capture and release tagging on a real
-prod deploy, not specifically client-bundle source-map resolution (Node/server output
-isn't minified the same way browser bundles are). Client-side source maps are still
-unverified against production.
+**Verified in production (2026-10-24):**
+1. A throwaway server route confirmed server-side capture
+   ([REVERA-WEBSITE-FRONTEND-2](https://iox-solutions.sentry.io/issues/REVERA-WEBSITE-FRONTEND-2)):
+   `environment: production`, `release` matching the deploy commit SHA, frame resolved
+   to real source. Removed in a follow-up commit.
+2. **`/sentry-test`** — a permanent, unlinked QA page (`src/app/sentry-test/page.tsx` +
+   `src/app/api/sentry-test-error/route.ts`) with a "throw client-side error" and
+   "throw server-side error" button, kept in the codebase (not a throwaway) so error
+   capture can be spot-checked on any deployment without a code change. Clicking the
+   client button produced
+   [REVERA-WEBSITE-FRONTEND-3](https://iox-solutions.sentry.io/issues/REVERA-WEBSITE-FRONTEND-3):
+   `environment: production`, release matching the commit SHA, frame resolved to real
+   source (`src/app/sentry-test/page.tsx:30:21`) — not minified bundle output — plus an
+   auto-attached session replay. This confirms the **client-bundle source-map upload**
+   works, closing the gap the server-only test left open.
+3. Incidentally surfaced while testing: the public `/sentry-test` page (like other
+   public pages) triggers a client-side `fetchCustomers` call that gets a real `401` in
+   production console — pre-existing, unrelated to this change, not investigated here.
 
 **Not done / limits:** no alert rules or uptime monitors were set up — not asked for.
 
