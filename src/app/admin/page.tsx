@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, useCallback, useRef, Fragment } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/lib/supabaseClient";
-import { recoverFromInvoluntarySignOut, verifyStaffSession, recordLogoutReason, clearLogoutReason, broadcastDeliberateLogout, wasDeliberateLogoutRecently, writeSharedActivity, lastActivityAcrossTabs, isIdleExpired, IDLE_LOGOUT_MS } from "@/lib/authRecovery";
+import { recoverFromInvoluntarySignOut, verifyStaffSession, pushAuthTrail, readAuthTrail, recordLogoutReason, clearLogoutReason, broadcastDeliberateLogout, wasDeliberateLogoutRecently, writeSharedActivity, lastActivityAcrossTabs, isIdleExpired, IDLE_LOGOUT_MS } from "@/lib/authRecovery";
 import { parseSection, withSection } from "@/lib/adminSection";
 import { ServiceItem, SERVICES, ALL_15MIN_SLOTS, getServiceDurationMinutes, getDurationInMinutes, getDurationLabel, normaliseTo24hSlot, getEffectiveServicePrice, getServicePriceDetails } from "@/lib/services";
 import { 
@@ -1724,8 +1724,20 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
       return;
     }
 
+    // A short tag for this tab, so the shared auth trail (see authRecovery.ts) shows which tab did what.
+    const tabTag = Math.random().toString(36).slice(2, 5);
+    const trail = (text: string) => {
+      const online = typeof navigator !== "undefined" && navigator.onLine === false ? " OFFLINE" : "";
+      const vis = typeof document !== "undefined" ? ` ${document.visibilityState}` : "";
+      pushAuthTrail(CLIENT.storagePrefix, `[${tabTag}] ${text}${vis}${online}`);
+    };
+    trail("page opened");
+    const onVisibility = () => trail("visibility changed");
+    document.addEventListener("visibilitychange", onVisibility);
+
     // 1. Initial Auth Session Check
     supabase.auth.getSession().then(({ data: { session: cachedSession } }: any) => {
+      trail(`getSession: ${cachedSession ? "has session" : "NO session"}`);
       if (cachedSession) {
         if (typeof window !== "undefined") {
           sessionStorage.setItem(`${CLIENT.storagePrefix}_admin_session_active`, "true");
@@ -1744,6 +1756,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
     // 2. Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string, newSession: any) => {
+      trail(`${event} session=${newSession ? "yes" : "no"}`);
       if (event === "SIGNED_OUT") {
         if (!explicitSignOutRef.current && wasDeliberateLogoutRecently(CLIENT.storagePrefix)) {
           // Another tab of this browser pressed Logout: follow it. Trying to "recover" the session
@@ -1756,6 +1769,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           // handing it the real refresh_token from the last session this page actually held,
           // rather than immediately dropping to the login screen mid-booking or mid-edit.
           const lastRefreshToken = lastKnownSessionRef.current?.refresh_token;
+          if (!lastRefreshToken) trail("SIGNED_OUT: no earlier session in this tab to recover from");
           if (lastRefreshToken) {
             (async () => {
               // First look at what is stored now: another tab may already have refreshed the login
@@ -1764,13 +1778,26 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               try {
                 const { data } = await supabase.auth.getSession();
                 if (data?.session) {
+                  trail("recovery: another tab had already refreshed the login");
                   handleAuthSession(data.session);
                   return;
                 }
               } catch {
                 /* fall through to the explicit refresh */
               }
-              const result = await recoverFromInvoluntarySignOut(supabase, lastRefreshToken);
+              const result = await recoverFromInvoluntarySignOut(
+                {
+                  auth: {
+                    refreshSession: async (args) => {
+                      const r = await supabase.auth.refreshSession(args);
+                      if (r.error) trail(`refresh refused: ${r.error.status ?? "?"} ${String(r.error.message ?? "").slice(0, 80)}`);
+                      return r;
+                    },
+                  },
+                },
+                lastRefreshToken
+              );
+              trail(result.recovered ? "recovery: refreshed OK" : `recovery failed: ${result.reason}`);
               if (result.recovered) {
                 handleAuthSession(result.session);
               } else {
@@ -1951,6 +1978,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
     return () => {
       subscription.unsubscribe();
+      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, []);
 
@@ -2419,7 +2447,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     if (!authChecking && !session) {
       if (typeof window !== "undefined") {
         if (!deliberateLogoutRef.current) {
-          recordLogoutReason(CLIENT.storagePrefix, 'session_ended', { onlyIfEmpty: true });
+          recordLogoutReason(CLIENT.storagePrefix, 'session_ended', { onlyIfEmpty: true, detail: readAuthTrail(CLIENT.storagePrefix).join('\n') });
         }
         sessionStorage.removeItem(`${CLIENT.storagePrefix}_admin_session_active`);
         window.location.replace("/login");

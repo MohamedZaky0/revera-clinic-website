@@ -1,6 +1,6 @@
 # DECISIONS.md — Revera Clinics Decision Log
 
-> **Last Updated:** 2026-09-06 (DEC-051)
+> **Last Updated:** 2026-10-21 (docs audit: duplicate DEC-025 heading renamed, migration-status lines of DEC-088/110/111/113/114/117 brought up to date; the highest number in use is DEC-122)
 > **Previous content was for a different project — discarded entirely**
 > **Rule:** Before changing any decision recorded here, read the full entry first.
 
@@ -1583,7 +1583,9 @@ Brief 17 written and queued (`WINDSURF_BRIEFS.md`), covering both parts.
 
 ---
 
-### DEC-025: Doctor Profile Details View in Admin Doctors Tab
+### DEC-025B: Doctor Profile Details View in Admin Doctors Tab
+
+> *ID note (2026-10-21 audit): this entry was numbered DEC-025 by mistake, the same as "Expired Package Sessions Either Convert To Revenue Or Are Extended" above, which the finance documents cite as DEC-025. It is a different decision; nothing else cites it by number.*
 
 **Date:** 2026-08-04  
 **Status:** Approved & Implemented  
@@ -2952,7 +2954,7 @@ Checklist: `ai_docs/manual_tests/LASER_LANDING_PAGES_MANUAL_TESTS.md`.
 ## DEC-088: Laser-Pulse Package Revenue Is Recognised Per Pulse Consumed (Extends DEC-023)
 
 **Date:** 2026-09-25
-**Status:** Decided — active (2026-09-25); implementation starting. Owner decisions: item 5 = expiry option A,
+**Status:** Decided — active (2026-09-25); implemented (the migration `20260925000000_pulse_revenue_recognition.sql` was applied to production per commit `b6bbc96`; presentation item 9 built on dev 2026-09-26). Owner decisions: item 5 = expiry option A,
 item 6 = flag-and-enter (no catalog fallback), item 9 = cash and earned revenue shown side by side with the
 deferred balance broken down. Items 1–4, 7, 8 and 10 follow from DEC-023 and the existing schema.
 
@@ -3626,7 +3628,7 @@ Investigation revealed:
 ## DEC-110: Employees Can Work At More Than One Branch (`branch_ids`), Active Branches Only
 
 **Date:** 2026-10-18
-**Status:** Decided & implemented — migration `20261018000000_add_branch_ids_to_employee_accounts.sql` written, **not yet applied** to dev or prod.
+**Status:** Decided & implemented — migration `20261018000000_add_branch_ids_to_employee_accounts.sql`; applied to dev (live evidence in `manual_tests/EMPLOYEE_MULTI_BRANCH_MANUAL_TESTS.md`); production application not recorded.
 **Manual tests:** `ai_docs/manual_tests/EMPLOYEE_MULTI_BRANCH_MANUAL_TESTS.md`
 
 **Context:** Owner request: in Add Employee, an employee must be assignable to more than one branch (tick boxes), and only *active* branches may be offered. Until now a non-doctor employee had exactly one branch (a single select bound to `employee_accounts.branch_id`); only doctors could tick several, and that list lived only inside the schedule JSON (`working_days_hours.branch_ids`, synced to `providers`), never on the employee row. The form also offered inactive branches, and pre-selected `branches[0]` whatever its status.
@@ -3651,7 +3653,7 @@ Investigation revealed:
 ## DEC-111: Services Can Be System-Only (Not On The Website)
 
 **Date:** 2026-10-19
-**Status:** Decided & implemented (migration to be applied before deploy)
+**Status:** Decided & implemented. Migration applied to dev (live evidence in `manual_tests/SERVICES_SHOW_ON_WEBSITE_MANUAL_TESTS.md`); production application not recorded here, confirm before relying on it there.
 
 **Context:** RRS, Derma and Mesotherapy are decided after the Consultation, so they must exist in the system (reception books them, the doctor adds them to a session, packages include them) without being advertised on the public site. Packages already have this (`show_on_website`).
 
@@ -3684,7 +3686,7 @@ Investigation revealed:
 ## DEC-113: A Role Chooses Its Workspace (Doctor Screens Or Standard), Instead Of The App Guessing From Names
 
 **Date:** 2026-10-20
-**Status:** Decided & implemented (migration to be applied before deploy)
+**Status:** Decided & implemented. Migration applied to dev (live evidence in `manual_tests/ROLE_WORKSPACE_MANUAL_TESTS.md`); production application not recorded here, confirm before relying on it there.
 
 **Context:** The doctor screens (Schedule, Ongoing Session, Patients, Analytics, Profile) were shown when ANY of eight name checks matched: the role was "doctor"/"doctors", or the department was "Doctors"/"Doctor", on either the login data or the employee record. The Add Employee form added more guessing on top (any role or department containing the letters "doc" switched the other field and showed the doctor-only sections, and invented a role called "Doctor" when none existed). Consequences seen: a clinic whose role is called "Consultant" never got the doctor screens; a receptionist filed under the Doctors department did; and creating a doctor on a database without a role named exactly "doctor" failed with "Role 'Doctor' does not exist. Please create it first." because the form sent a role that was never in the list.
 
@@ -3703,7 +3705,7 @@ Investigation revealed:
 ## DEC-114: An Admin Can Also Be A Doctor (`employee_accounts.is_also_doctor`)
 
 **Date:** 2026-10-21
-**Status:** Decided & implemented (migration to be applied before deploy)
+**Status:** Decided & implemented. Migration applied to dev (live evidence in `manual_tests/ADMIN_ALSO_DOCTOR_MANUAL_TESTS.md`); production application not recorded here, confirm before relying on it there.
 
 **Context:** DEC-113 made the doctor screens a property of the role. An account has exactly one role, so an admin or superadmin who also treats patients (the clinic owner, for instance) could open the doctor screens through the Doctor view switch, but had no `providers` row, so their schedule was empty and they could not be picked as a doctor in bookings. Making them a doctor-workspace role would have taken away their admin screens and permissions.
 
@@ -3747,7 +3749,7 @@ Investigation revealed:
 ## DEC-117: Employee Accounts Can Be Switched Inactive; Admins Can Manage And Delete Other Accounts
 
 **Date:** 2026-10-22
-**Status:** Decided & implemented (migration to be applied before deploy)
+**Status:** Decided & implemented. Migration applied to dev (live evidence in `manual_tests/ACCOUNT_ACTIVE_INACTIVE_MANUAL_TESTS.md`); production application not recorded here, confirm before relying on it there.
 
 **Context:** the owner wanted an admin to be able to edit, remove and switch off other admin accounts, with "inactive" meaning that person has no access to the system at all, and the switch shown as a toggle in the Employees table. Before this: deleting an account (soft or permanent) was superadmin-only; the "soft delete" overwrote `role_name` with `'inactive'`, which lost the real role, could not be undone cleanly, and did not actually block anything (the staff-access check only looked for an employee row).
 
@@ -3775,6 +3777,8 @@ Investigation revealed:
 3. The reverse link was fixed too: soft-deleting a doctor from the Doctors screen used to overwrite `role_name` with `'inactive'` on EVERY employee sharing that name (the same hack DEC-117 removed). It now switches only the single matching account off (`deactivateEmployeeForProvider`), never a superadmin, and keeps the role.
 
 **Not done / limits:** switching the account back on also turns the doctor back on, even if the doctor had been deactivated separately on the Doctors screen before; do that again if needed. Deactivating a doctor on the Doctors screen (the status toggle) does not switch their account off; only the soft delete does. Bookings already made with that doctor are untouched.
+
+---
 
 ## DEC-119: Booking History Shows Service Price, Paid And Outstanding Per Booking
 
@@ -3839,3 +3843,77 @@ Investigation revealed:
 
 **Not done / limits:** in edit mode, adding a package or product no longer updates the invoice value by itself either; type the new total. The booking details screen still shows the generic "Clinic Service" label for a booking with no service.
 
+---
+
+## DEC-123: Error Monitoring Via Sentry (`@sentry/nextjs`), Wired For Production
+
+**Date:** 2026-10-24
+**Status:** Decided & implemented (one manual step outstanding — see Not done)
+
+**Context:** the app had no error monitoring — a production error was only visible if a
+user reported it. Owner set up the Sentry org (`iox-solutions`) and asked for it wired
+into this app for the production environment.
+
+**Decision:**
+1. New Sentry project `revera-website-frontend` under org `iox-solutions`
+   (https://iox-solutions.sentry.io/projects/revera-website-frontend/), platform
+   `javascript-nextjs`.
+2. `@sentry/nextjs@^11.9.0` installed. Standard baseline enabled: error monitoring +
+   tracing (10% sampled in production, 100% in dev) + session replay (10% of sessions,
+   100% of sessions with an error) — logs are on by default in this SDK version
+   (`enableLogs` was removed upstream; see Not done).
+3. Config files follow the `src/` layout already used by `middleware.ts`:
+   `src/instrumentation-client.ts` (browser), `src/sentry.server.config.ts` (Node),
+   `src/sentry.edge.config.ts` (Edge), `src/instrumentation.ts` (runtime dispatch +
+   `onRequestError` for automatic server-error capture), `src/app/global-error.tsx`
+   (root render errors, App Router).
+4. `next.config.ts` wrapped with `withSentryConfig` from **`@sentry/nextjs/config`** —
+   not the package root; in this SDK version `withSentryConfig` is a build-time-only
+   subpath export, and importing it from `@sentry/nextjs` throws
+   `withSentryConfig is not a function` at `next dev`/`next build` time. Also sets
+   `tunnelRoute: "/monitoring"` (ad-blocker bypass); `middleware.ts`'s matcher is scoped
+   to `/api/:path*` only, so it doesn't intercept that route.
+5. Verified end to end in dev: a real thrown error in an API route landed in Sentry
+   ([REVERA-WEBSITE-FRONTEND-1](https://iox-solutions.sentry.io/issues/REVERA-WEBSITE-FRONTEND-1)),
+   frame resolved to real source (`src/app/api/sentry-test-error/route.ts:2:9`), release
+   tag auto-populated from the git commit SHA. Checklist:
+   `ai_docs/manual_tests/SENTRY_SETUP_MANUAL_TESTS.md`.
+6. Production env vars set on Vercel (`revera-clinic-website` project, production
+   target only): `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_DSN`, `SENTRY_ORG`, `SENTRY_PROJECT`,
+   and `SENTRY_AUTH_TOKEN` (an Organization Token the owner generated in Sentry's UI —
+   the Sentry MCP has no tool to mint API tokens, by design). The DSNs/org/project
+   values are public identifiers; the auth token is the one real secret, stored as
+   type `sensitive`.
+
+**Verified in production (2026-10-24):**
+1. A throwaway server route confirmed server-side capture
+   ([REVERA-WEBSITE-FRONTEND-2](https://iox-solutions.sentry.io/issues/REVERA-WEBSITE-FRONTEND-2)):
+   `environment: production`, `release` matching the deploy commit SHA, frame resolved
+   to real source. Removed in a follow-up commit.
+2. **`/sentry-test`** — a permanent, unlinked QA page (`src/app/sentry-test/page.tsx` +
+   `src/app/api/sentry-test-error/route.ts`) with a "throw client-side error" and
+   "throw server-side error" button, kept in the codebase (not a throwaway) so error
+   capture can be spot-checked on any deployment without a code change. Clicking the
+   client button produced
+   [REVERA-WEBSITE-FRONTEND-3](https://iox-solutions.sentry.io/issues/REVERA-WEBSITE-FRONTEND-3):
+   `environment: production`, release matching the commit SHA, frame resolved to real
+   source (`src/app/sentry-test/page.tsx:30:21`) — not minified bundle output — plus an
+   auto-attached session replay. This confirms the **client-bundle source-map upload**
+   works, closing the gap the server-only test left open.
+3. Incidentally surfaced while testing: the public `/sentry-test` page (like other
+   public pages) triggers a client-side `fetchCustomers` call that gets a real `401` in
+   production console — pre-existing, unrelated to this change, not investigated here.
+
+**Not done / limits:** no alert rules or uptime monitors were set up — not asked for.
+
+## DEC-124: When A Login Ends Unexpectedly, The Login Page Shows What Happened (Diagnostic Trail)
+
+**Date:** 2026-10-24 · **Status:** Done on dev; not yet on production · **Related:** RISK-114, RISK-117, RISK-130
+
+**Decision:** keep a short trail of the browser's auth events (at most the last 15: the event Supabase fired, whether the tab was visible, whether the browser was offline, and the outcome of a recovery attempt, with a short tag per tab) in `localStorage` (`<prefix>_auth_trail`, helpers `pushAuthTrail` / `readAuthTrail` / `clearAuthTrail` in `src/lib/authRecovery.ts`). When the admin shell sends the person to /login only because the session vanished (`session_ended`), that trail is stored with the reason and printed under the notice on the login page (`recordLogoutReason(..., { detail })`, `consumeLogoutNotice`).
+
+**Why:** the clinic reception laptop, and only that laptop, was sent to /login while choosing a date in Add Previous Booking. The notice only said "Your session ended unexpectedly"; the clock, the form and the idle timer were ruled out from the code, and the remaining causes (a second tab or browser using the same login, a server-side session limit, the laptop sleeping or losing the network) cannot be told apart without seeing what the browser went through. The trail makes the cause readable from one screenshot of the login page.
+
+**What it never contains:** tokens, e-mail addresses, patient data. Only event names, yes/no flags, a time, a three-letter tab tag, and the short text of a refresh error.
+
+**Not done on purpose:** no server-side log yet. While the session is dead the server rejects requests, so a server log would have to be sent after the next successful login; that is a possible follow-up (a superadmin "sign-in problems" list) once the trail shows what kind of problem this is.

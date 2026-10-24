@@ -258,3 +258,48 @@ describe('idle detection across tabs', () => {
     expect(lastActivityAcrossTabs(123, 'revera', now, s)).toBe(123);
   });
 });
+
+describe('auth trail and logout detail (why did the session end?)', () => {
+  function fakeStorage() {
+    const m = new Map<string, string>();
+    return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k) };
+  }
+
+  it('keeps only the latest entries, each stamped with the time', async () => {
+    const { pushAuthTrail, readAuthTrail } = await import('@/lib/authRecovery');
+    const s = fakeStorage();
+    for (let i = 1; i <= 20; i++) pushAuthTrail('revera', `event ${i}`, { storage: s });
+    const trail = readAuthTrail('revera', s);
+    expect(trail).toHaveLength(15);
+    expect(trail[0]).toMatch(/^\d{2}:\d{2}:\d{2} event 6$/);
+    expect(trail[14]).toMatch(/event 20$/);
+  });
+
+  it('a broken or non-list stored trail reads as empty instead of throwing', async () => {
+    const { readAuthTrail, pushAuthTrail } = await import('@/lib/authRecovery');
+    const s = fakeStorage();
+    s.setItem('revera_auth_trail', 'not json');
+    expect(readAuthTrail('revera', s)).toEqual([]);
+    s.setItem('revera_auth_trail', JSON.stringify({ a: 1 }));
+    expect(readAuthTrail('revera', s)).toEqual([]);
+    pushAuthTrail('revera', 'after garbage', { storage: s });
+    expect(readAuthTrail('revera', s)).toHaveLength(1);
+  });
+
+  it('the detail written with a reason comes back with it, once', async () => {
+    const { consumeLogoutNotice } = await import('@/lib/authRecovery');
+    const s = fakeStorage();
+    recordLogoutReason('revera', 'session_ended', { storage: s, detail: '10:01:02 [abc] SIGNED_OUT session=no' });
+    expect(consumeLogoutNotice('revera', s)).toEqual({ reason: 'session_ended', detail: '10:01:02 [abc] SIGNED_OUT session=no' });
+    expect(consumeLogoutNotice('revera', s)).toBeNull();
+  });
+
+  it('a reason recorded without detail has none, and consumeLogoutReason still returns just the reason', async () => {
+    const { consumeLogoutNotice } = await import('@/lib/authRecovery');
+    const s = fakeStorage();
+    recordLogoutReason('revera', 'inactivity', { storage: s });
+    expect(consumeLogoutNotice('revera', s)).toEqual({ reason: 'inactivity' });
+    recordLogoutReason('revera', 'inactivity', { storage: s, detail: 'x' });
+    expect(consumeLogoutReason('revera', s)).toBe('inactivity');
+  });
+});
