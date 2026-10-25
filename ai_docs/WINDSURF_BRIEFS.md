@@ -10,8 +10,146 @@ Standing rules live in `.windsurf/rules/*.md` (loaded automatically) and `.winds
 
 # ACTIVE BRIEF
 
-No brief is currently active — Brief 35 landed and is archived below. The items below are queued but
-not yet written up; write one before handing it to Windsurf.
+### Brief 37 — Give historical-booking packages a real `package_id` link instead of reconstructing them from `notes` text
+
+**Read first:** `.windsurf/rules/10-database.md` (migrations, camelCase/snake_case, never apply a
+migration yourself), `ai_docs/DB_SCHEMA.md` → `reservation_products` and `invoice_lines`,
+`ai_docs/RISKS.md` RISK-038/RISK-057 (the exact same defect class, already fixed once for products
+— read this one carefully, it is the precedent this brief follows).
+
+**The complaint (Mohamed, 2026-10-25).** Opening "Edit Previous Booking" on a historical booking
+that had a package attached showed a red banner: `Could not load packages: invalid input syntax for
+type uuid: "pkg-0"`, and the save failed. Traced to Claude Code reading the code directly (not
+guessed) on `fix/profile-reads-via-api`/`main` — **dev still has the original bug**, see below.
+
+### Findings — verified by reading the code on 2026-10-25 on `origin/dev` (`55cd7c8`); re-verify line numbers before editing
+
+1. **`reservation_products` has no `package_id` column** (`ai_docs/DB_SCHEMA.md` → `reservation_products`,
+   confirmed against `supabase/migrations/20260817020000_create_reservation_products.sql`). It has
+   `product_id` and `service_id` FKs, but a package attached to a booking is written as **free text
+   only**: `src/app/api/reservations/previous/route.ts:557-566` (POST, step 7c) inserts
+   `description: \`Package: ${p.packageName}\`` with no id column to hold `p.packageId` /
+   `p.customerPackageId` at all — those values are simply dropped on the floor at write time.
+2. **`PATCH /api/reservations/previous` never writes `reservation_products` at all** — grep
+   `reservation_products` in that file and every hit is inside the `POST` handler (lines 479-567).
+   Editing a historical booking does not sync its line items; whatever was written at creation time
+   (or nothing, for a booking older than DEC-042) is all that ever exists.
+3. **The Edit form reconstructs "which package is on this booking" entirely by regex-parsing
+   `notes`.** `src/components/admin/bookings/AdminAddPreviousBookingView.tsx:941`:
+   `rawNotes.split(/Package:\s*/i)`, then fuzzy-matches the extracted name against the catalog
+   (`pkgList`) and the patient's existing packages (`patientExistingPackages`) by **string equality
+   on the name**. When a name doesn't match either — the package was renamed or deleted from the
+   catalog since this booking was recorded — the code fabricated a placeholder id,
+   `` `pkg-${idx}` `` (line ~965), and sent it straight to the server as a real `packageId` on save.
+4. **Why it crashed:** `resolveHistoricalPackages()` (`src/lib/historicalPackages.ts:154-159`) runs
+   `supabaseServer.from('packages').select(...).in('id', catalogIds)` with that fabricated id in
+   `catalogIds`. Postgres rejects a non-uuid value for a uuid column with code `22P02`, which this
+   function's catalog-lookup branch did **not** special-case the way its `customer_packages` lookup
+   two blocks above (line 140) already does — so the raw Postgres error reached the user verbatim.
+5. **A safety-net fix for the crash already landed directly on `main`, bypassing `dev`** (commits
+   `0c17d2a` on `fix/profile-reads-via-api`, cherry-picked to `main` as `14d21f4` — **not on `dev`,
+   confirmed**: `dev`'s copy of `AdminAddPreviousBookingView.tsx:965` still has the `` `pkg-${idx}` ``
+   placeholder as of this brief). That fix stops the crash (empty id instead of a fake one, filtered
+   out of the save payload, a warning shown on the unmatched package's card, and the same `22P02`
+   friendly-message handling RISK-038/057 established for products) but is a **stopgap, not the
+   fix** — the notes-text parsing is still the only source of truth. This brief is the real fix.
+   Diff those two commits for the stopgap's exact shape before starting Part C below — it's useful
+   context for what the UI already expects when a package can't be resolved.
+6. **Products already have half of this fix, and it's silently dead.** `GET /api/reservations`
+   (`src/app/api/reservations/route.ts:802-830`) batch-fetches `reservation_products` per
+   reservation and attaches it as `attachedProducts` (`mapRow`, line 99) — a *real* `product_id`-
+   backed source. But `mapReservationProduct()` (line 44-55) never exposes the underlying
+   `product_id` in its output (only the line's own `id`, plus `serviceId` for `additional_service`
+   rows) — **and** `AdminAddPreviousBookingView.tsx`'s edit-population code (line ~901) checks
+   `targetBooking.product_ids` / `.productIds` / `.products` / `.product_id` — none of which is the
+   real field name (`attachedProducts`) the API actually returns. So in practice products fall
+   through to the identical notes-regex path 100% of the time today; it just doesn't crash, because
+   product names happen to still match more often. **Do not fix this in this brief** — see Out of
+   Scope — but keep it in mind as the precedent for Part C's shape below, and flag in your report if
+   you find anything that makes it worse.
+
+### Scope — four ordered parts, stop after each for Mohamed/Claude Code to check
+
+**Part A — schema.** Add `package_id uuid REFERENCES packages(id) ON DELETE SET NULL` and
+`customer_package_id uuid REFERENCES customer_packages(id) ON DELETE SET NULL` to
+`reservation_products`. New migration file (`ADD COLUMN IF NOT EXISTS`, per the standing rule), and
+update `ai_docs/DB_SCHEMA.md`'s `reservation_products` section in the **same commit**. Do not apply
+the migration yourself.
+
+**Part B — write side.**
+1. `POST /api/reservations/previous` step 7c (route.ts:557): include `package_id: p.packageId ||
+   null` and `customer_package_id: p.customerPackageId || null` in the insert.
+2. `PATCH /api/reservations/previous`: add the equivalent write that does not exist today (finding
+   #2). On a successful edit, delete this reservation's existing `reservation_products` rows that
+   represent a package (a dedicated `line_type` value, or `line_type = 'additional_service' AND
+   package_id IS NOT NULL` — pick one and say which in your report, but it must not touch
+   product/service lines or a *live* doctor-session's add-ons, which this endpoint never writes
+   anyway since `is_historical` bookings are always created `status: 'completed'` through this one
+   route — verify that assumption before relying on it), then re-insert fresh rows for the
+   currently-attached packages, same shape as Part B.1.
+
+**Part C — read side.**
+1. `mapReservationProduct()` (route.ts:44-55): add `packageId: p.package_id ?? null` and
+   `customerPackageId: p.customer_package_id ?? null` to its returned shape.
+2. `AdminAddPreviousBookingView.tsx`'s edit-population (around line 937-1003): when
+   `targetBooking.attachedProducts` contains a row with a non-null `packageId`/`customerPackageId`,
+   build the attached-package entry from **that row's real ids and stored `description`/
+   `unit_price`** — not from parsing `notes`. Keep the current `notes`-regex block as the fallback
+   **only** for a booking whose `attachedProducts` has no package-type rows at all (i.e. it predates
+   this migration, or Part B never ran for it) — do not delete the fallback, just demote it. When
+   the fallback path still can't match a name to a real package, it must behave like the existing
+   `main`-only stopgap (finding #5): empty id, excluded from the save payload, warning shown — port
+   that exact behavior into `dev` as part of this same part (don't leave `dev` with the crash while
+   this brief is only partly landed).
+
+**Part D — land the stopgap on `dev` first, as its own tiny commit, before starting Part A.**
+`dev` currently has the live crash (finding #5); Parts A-C will take more than one sitting. Port
+commit `0c17d2a`'s behavior (or cherry-pick/rebase it directly — check whether it applies cleanly;
+`dev` has diverged from `fix/profile-reads-via-api` since then) onto `dev` first, so the crash is
+gone immediately regardless of how long the rest of this brief takes. Confirm the `22P02` message in
+`historicalPackages.ts:159` also gets the same friendly-text treatment the `customer_packages` branch
+already has (line 140) — same stopgap commit covers it.
+
+### Out of scope — do NOT do these in this brief
+- Fixing the identical products gap (finding #6) — report it in full (you now have more detail than
+  this brief gives you once you're in the file), do not fix it. It needs its own brief: exposing
+  `productId` in `mapReservationProduct()` changes a shape 3 other call sites may depend on
+  (recheck RISK-038/057's note about 3 independent regex parsers before touching it), which is a
+  wider blast radius than this brief's.
+- Syncing `reservation_products` for **products or services** on `PATCH` (only packages, per Part
+  B.2). The identical gap exists for products/services too but fixing all three at once triples the
+  review surface; report it, do not fix it.
+- Backfilling `package_id`/`customer_package_id` on existing `reservation_products` rows for
+  bookings recorded before this migration. They stay `NULL`; the Part C fallback covers display for
+  them. No guessed backfill (standing rule).
+- Changing `resolveHistoricalPackages()`'s validation logic beyond the one `22P02` message fix in
+  Part D — it is otherwise correct and recently reviewed.
+
+### Acceptance
+- A fresh historical booking with a package attached, then edited (service/date/payment changed,
+  package left alone): the package's real id round-trips through save → reload with **zero** `notes`
+  parsing involved — verify by temporarily blanking `notes` in the DB for a test row and confirming
+  the package still shows correctly on Edit.
+- A booking whose package was later renamed in the catalog: editing it still shows the **current**
+  catalog name (not the stale name baked into old `notes` text), because it's now read by id.
+- A pre-migration booking (`reservation_products` has no package-type row for it) with a package
+  name in `notes` that **does** match the catalog: still loads and saves correctly via the fallback.
+- A pre-migration booking whose package name **does not** match anything: shows the warning, saves
+  the rest of the booking, does not crash — on `dev`, not just `main` (Part D, land first).
+- `npx tsc --noEmit` and `npx eslint` clean (0 errors) on every touched file. Full `npx vitest run`
+  passes — extend `tests/routes/reservations-previous-package.test.ts` and
+  `tests/routes/reservations-previous-edit.test.ts` rather than writing new files, they already
+  cover this exact area.
+
+### Deliverables (standing project rules)
+Dev Notes block per `CLAUDE.md`; a manual test checklist
+`ai_docs/manual_tests/RISK_138_PACKAGE_REAL_ID_MANUAL_TESTS.md` (confirm RISK-138 is still free —
+`grep -n "^## RISK-1" ai_docs/RISKS.md | tail -3` — before using it, `dev` moves fast; it was taken
+twice while this brief was being written) and the `RISKS.md` entry in the same change,
+cross-referencing RISK-038/RISK-057 as the precedent. **Verify in a logged-in browser** — this
+brief was written from reading code only, nothing above has been seen live.
+
+---
 
 ### Queued, not yet written
 
