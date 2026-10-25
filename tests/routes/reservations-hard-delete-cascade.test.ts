@@ -41,7 +41,7 @@ function fromWithFailures(table: string) {
 
 vi.mock('@/lib/supabaseServer', () => ({
   supabaseServer: {
-    auth: { getUser: (...args: any[]) => fake.authGetUser(...args) },
+    auth: { getUser: (...args: any[]) => fake.authGetUser(...args), getClaims: (...args: any[]) => fake.authGetClaims(...args) },
     from: (table: string) => fromWithFailures(table),
     rpc: (name: string, args?: any) => fake.client.rpc(name, args),
   },
