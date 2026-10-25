@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Branch } from "@/types";
 import { ServiceCommissionEntry } from "@/components/admin/services/DoctorServiceCommissionEditor";
 import { clearFetchCache } from "@/lib/fetchCache";
@@ -123,23 +123,39 @@ export function useProviderForm({
     }
   }, [activeNav, adminRole, hasPermission, providerTab]);
 
-  // ── Attendance fetch effect ──
-  async function fetchAttendance(dateStr: string) {
+  // ── Attendance fetch (RISK-135) ──
+  // Must keep a stable identity: it is a dependency of the effect below, and the fetch itself sets
+  // state, which re-renders the admin page. A new function per render made that effect re-run after
+  // every fetch, i.e. an endless GET loop while the Attendance tab was open.
+  const attendanceInFlightDateRef = useRef<string | null>(null);
+  const attendanceRequestSeqRef = useRef(0);
+
+  const fetchAttendance = useCallback(async (dateStr: string, opts?: { force?: boolean }) => {
+    // In-flight guard: a second call for the same date while one is running is skipped.
+    // `force` (used right after a save) bypasses it so the refetch reflects the saved row.
+    if (!opts?.force && attendanceInFlightDateRef.current === dateStr) return;
+    attendanceInFlightDateRef.current = dateStr;
+    // Only the newest request may write state, so a slow response for an older date (or an older
+    // pre-save response) cannot overwrite what the user is looking at.
+    const seq = ++attendanceRequestSeqRef.current;
     setLoadingProviderAttendance(true);
     try {
       const res = await fetch(`/api/provider-attendance?date=${dateStr}`, { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
-        setAttendanceRecords(data);
+        if (seq === attendanceRequestSeqRef.current) setAttendanceRecords(data);
       } else {
         console.error("Failed to fetch attendance");
       }
     } catch (err) {
       console.error("fetchAttendance error:", err);
     } finally {
-      setLoadingProviderAttendance(false);
+      if (seq === attendanceRequestSeqRef.current) {
+        attendanceInFlightDateRef.current = null;
+        setLoadingProviderAttendance(false);
+      }
     }
-  }
+  }, []);
 
   useEffect(() => {
     if (providerTab === "Attendance") {
@@ -167,7 +183,7 @@ export function useProviderForm({
       });
 
       if (res.ok) {
-        fetchAttendance(attendanceDate);
+        fetchAttendance(attendanceDate, { force: true });
       } else {
         alert("Failed to save attendance record.");
       }

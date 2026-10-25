@@ -14,7 +14,7 @@
 
 ## Status summary
 
-**9 open** · **13 partially resolved** · **104 resolved** · 126 tracked total.
+**9 open** · **13 partially resolved** · **105 resolved** · 127 tracked total.
 Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-partially-resolved) · [Resolved](#-resolved)
 
 ---
@@ -1268,6 +1268,7 @@ filled in with the above.
 - [RISK-129](#risk-129) — Patients Who Paid Showed "Total Spend 0" (RESOLVED, NOT YET CONFIRMED ON PRODUCTION)
 - [RISK-133](#risk-133) — "Hard Delete" Of A Patient Looked Like It Did Nothing: The Patient Came Back From Its Bookings (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
 - [RISK-134](#risk-134) — Every Staff Request Asked The Supabase Auth Server To Check The Login, About 68,000 Auth Requests An Hour, Which Helped Keep The Production Database Unhealthy (RESOLVED ON DEV, NOT YET CONFIRMED ON PRODUCTION)
+- [RISK-135](#risk-135) — Doctors > Attendance Sent The Same Request Over And Over While The Tab Was Open (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER)
 
 ## RISK-003: Patient Auth Is Non-Functional
 
@@ -5705,3 +5706,19 @@ See `PROPOSALS.md` for:
 **Not verified:** the effect on production Auth request counts (needs a deploy and a day of Supabase "Auth" metrics); that `next build` bundles `src/middleware.ts` unchanged on Vercel (the middleware no longer imports Supabase, so this is low risk, but no production build was run in this change); the owner's own admin session on the deployed site.
 
 **Tests:** `tests/lib/verifyToken.test.ts` (real supabase-js `getClaims` with a generated ES256 key and a stubbed network), `tests/routes/local-jwt-verification.test.ts`, `tests/routes/middleware-auth.test.ts`. Manual checklist: `ai_docs/manual_tests/LOCAL_JWT_VERIFICATION_MANUAL_TESTS.md`.
+
+## RISK-135: Doctors > Attendance Sent The Same Request Over And Over While The Tab Was Open (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER)
+
+**Manual test checklist:** `ai_docs/manual_tests/ATTENDANCE_FETCH_LOOP_MANUAL_TESTS.md`
+
+**Severity:** Medium (no wrong data shown; wasted requests, battery and database load for every open tab) · **Type:** Performance / UI state
+**Found:** 2026-10-25, by a code audit (not seen in the browser). The rate is an estimate from the code, not a measurement: roughly one `GET /api/provider-attendance` per render cycle, which the audit put at 60 or more a minute per open tab.
+
+**Cause:** in `src/components/admin/doctor/useProviderForm.ts`, `fetchAttendance` was a plain `async function` declared in the hook body, so it was a new function on every render of the admin page. The effect that loads attendance listed it in its dependencies (`[providerTab, attendanceDate, fetchAttendance]`). The fetch itself sets state (`setLoadingProviderAttendance`, `setAttendanceRecords`), which re-renders the admin page, which created a new `fetchAttendance`, which re-ran the effect, which fetched again, with no end while the Attendance tab was open. The only thing that switches that tab on is the permission effect in the same hook, for staff whose role has `providers.attendance` but not `providers.view` (superadmin and ordinary doctor-list roles never reach it). Because the hook lives in the admin page and the fetch effect does not look at the open screen, the loop kept running on every admin screen after that, not only on Doctors.
+- Only `GET /api/provider-attendance` (PostgREST, read only) was involved. Nothing was written, so no data was changed or lost.
+
+**Fix:** `fetchAttendance` is now stable (`useCallback`), so the effect runs only when the tab or the selected date changes. It also has an in-flight guard: a second call for the same date while one is running is skipped. The refetch after saving an attendance row bypasses that guard (`{ force: true }`) so the table shows the saved row, and only the newest request may write the table, so a slow reply for an older date cannot overwrite the current one. Behaviour is otherwise unchanged (the single load still happens on whichever screen is open once the tab is set; not gated on the open screen, to keep this change minimal).
+
+**Tests:** `tests/components/doctor/useProviderFormAttendance.test.tsx` mounts the hook with a mocked `fetch`: one GET on opening the tab and none after its own re-render, no GET on the Doctors tab, one more GET on a date change, one POST then one GET after a save, overlapping calls skipped, a stale reply ignored. Run against the old code, 6 of its 7 tests fail (the loop never settles).
+
+**Still to do:** confirm in the browser (Network tab on Doctors > Attendance, idle for a minute: one request). The Attendance tab itself is still not shown in the UI (see the "Dead Attendance plumbing" comment in the hook); this fix only stops the requests.
