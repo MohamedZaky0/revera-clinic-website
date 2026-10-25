@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, useCallback, useRef, Fragment } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/lib/supabaseClient";
+import { clockSkewMs, isClockSkewed } from "@/lib/clockSkew";
+import ClockSkewBanner from "@/components/admin/ClockSkewBanner";
 import { recoverFromInvoluntarySignOut, verifyStaffSession, pushAuthTrail, readAuthTrail, recordLogoutReason, clearLogoutReason, broadcastDeliberateLogout, wasDeliberateLogoutRecently, writeSharedActivity, lastActivityAcrossTabs, isIdleExpired, IDLE_LOGOUT_MS } from "@/lib/authRecovery";
 import { parseSection, withSection } from "@/lib/adminSection";
 import { ServiceItem, SERVICES, ALL_15MIN_SLOTS, getServiceDurationMinutes, getDurationInMinutes, getDurationLabel, normaliseTo24hSlot, getEffectiveServicePrice, getServicePriceDetails } from "@/lib/services";
@@ -804,6 +806,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   // RISK-117: a valid session exists but /api/auth/me could not be reached or answered (cold start,
   // brief network loss). The page keeps the session and offers a retry instead of bouncing to /login.
   const [sessionVerifyFailed, setSessionVerifyFailed] = useState(false);
+  // RISK-130: this computer's clock minus the server's (ms), measured from /api/auth/me; null until known.
+  const [clockSkew, setClockSkew] = useState<number | null>(null);
   const retryVerifyRef = useRef<(() => void) | null>(null);
   // True once the person pressed Logout. signOut() fires SIGNED_OUT and empties `session` a moment
   // before the redirect to /login, and the "no session -> /login" effect below must not label that
@@ -1830,6 +1834,19 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
         lastKnownSessionRef.current = newSession;
         return;
       }
+      // RISK-130: a token refresh of a login that was verified a moment ago does not need another
+      // /api/auth/me round trip; on a computer with a wrong clock refreshes arrive several per second.
+      if (
+        event === "TOKEN_REFRESHED" &&
+        newSession?.user &&
+        verified &&
+        verified.userId === newSession.user.id &&
+        Date.now() - verified.at < 60 * 1000
+      ) {
+        lastKnownSessionRef.current = newSession;
+        setSession(newSession);
+        return;
+      }
       handleAuthSession(newSession);
     });
 
@@ -1868,7 +1885,13 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
         // failure that is not an auth answer (cold start, network) keeps the session.
         const verification = await verifyStaffSession({
           session: currSession,
-          fetchMe: (accessToken) => fetch('/api/auth/me', { headers: { 'Authorization': `Bearer ${accessToken}` } }),
+          fetchMe: async (accessToken) => {
+            const res = await fetch('/api/auth/me', { headers: { 'Authorization': `Bearer ${accessToken}` } });
+            const skew = clockSkewMs(res.headers.get('date'));
+            setClockSkew(skew);
+            if (isClockSkewed(skew)) trail(`clock off vs server: ${Math.round((skew as number) / 60000)} min`);
+            return res;
+          },
           refreshSession: () => supabase.auth.refreshSession(),
         });
 
@@ -6527,6 +6550,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
         </aside>
 
         <main dir={lang === "ar" ? "rtl" : "ltr"} className="flex flex-col min-w-0 w-full px-3 sm:px-4 md:px-8 py-0 overflow-x-hidden">
+          <ClockSkewBanner skewMs={clockSkew} lang={lang === "ar" ? "ar" : "en"} />
           {/* Top Navigation Bar */}
           <div className="sticky top-0 z-40 flex items-center justify-between border-b border-[var(--cr-primary)]/10 bg-[var(--color-brand-sand)]/90 px-2 sm:px-4 py-2.5 sm:py-3 backdrop-blur-md gap-2 sm:gap-3">
             {/* Left: language toggle + branch selector */}

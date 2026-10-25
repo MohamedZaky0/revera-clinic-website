@@ -5542,15 +5542,17 @@ See `PROPOSALS.md` for:
 
 **Open:** the same patient also has a booking with no service (shown as "Service #null") and 2,820 outstanding; whether that is real or a data entry problem was not checked. Outstanding on the card (2,820) vs the sum of the rows (2,920) is the stored-value drift described in DEC-121.
 
-## RISK-130: One Reception Laptop Is Sent To The Login Page While Choosing A Date In Add Previous Booking (OPEN, DIAGNOSTIC ADDED)
+## RISK-130: One Reception Laptop Was Sent To The Login Page At Random: Its Clock Was An Hour Ahead (CAUSE FOUND AND FIXED ON THAT LAPTOP; APP NOW WARNS ABOUT IT)
 
 **Manual test checklist:** `ai_docs/manual_tests/SESSION_ENDED_TRAIL_MANUAL_TESTS.md`
 
 **Severity:** Medium (loses the form being filled in) · **Type:** Session / authentication
-**Found:** 2026-10-24, reported by the owner with a phone video of the clinic laptop: the "Staff Authentication Required ... Redirecting" card for under a second, then /login with "Your session ended unexpectedly" (the `session_ended` reason). It happens on that laptop only; the laptop's date and time are correct.
+**Found:** 2026-10-24, reported by the owner with a phone video of the clinic laptop: the "Staff Authentication Required ... Redirecting" card for under a second, then /login with "Your session ended unexpectedly" (the `session_ended` reason), while choosing a date in Add Previous Booking. That laptop only.
 
-**What is known:** the form makes no network call when the date changes, so the date is not itself the trigger. `session_ended` means Supabase reported the login as gone (`SIGNED_OUT`) without anyone pressing Logout, and the one silent recovery attempt (RISK-114) did not bring it back.
+**Cause (read off the DEC-124 trail the laptop printed, then confirmed with its clock):** 11 `TOKEN_REFRESHED` events in 3 seconds, then `refresh refused: 429 Request rate limit reached`, then `SIGNED_OUT`. The laptop's Windows did not know Egypt's summer time (the "Adjust for daylight saving time" switch was off and greyed), so someone had set the clock by hand to look right; its internal UTC clock was therefore one hour ahead of the real one. A login token lives one hour, so every fresh token already looked expired to the browser, and every `getSession()` (every API call and 15 s poll, from several screens at once) refreshed it again until Supabase's rate limit refused and the login was dropped. After "Sync now" the laptop's UTC was right (checked against another computer's UTC).
 
-**Suspected, not confirmed:** (1) the same staff login open in more than one tab or browser on that laptop (refresh-token rotation collision, RISK-114); (2) a session time-box or inactivity limit on the production Supabase project (Authentication -> Sessions; the local `config.toml` has both off, which says nothing about production); (3) the laptop sleeping or losing the network.
+**Not the cause (ruled out):** the form (no network call on a date change); a second tab (the trail showed one tab); Supabase session limits (the production project has single-session, time-box and inactivity timeout all off, and the free plan cannot set them).
 
-**Done:** DEC-124 trail printed on the login page. **Open:** read the trail after the next occurrence and fix the real cause.
+**Fix:** (1) clock synchronised on that laptop; staff told not to set the time by hand; the taskbar shows an hour less than Cairo's real time until Egypt leaves summer time on 29 Oct 2026 (cosmetic: the browser knows the rule and the app shows the right time). (2) DEC-125: the admin shows a warning when a computer's clock differs from the server's by 5 minutes or more, and a burst of token refreshes no longer causes a burst of API calls.
+
+**Still true:** any computer with a clock this far out will hit this until its clock is fixed; DEC-125 only makes it visible and softer, it cannot correct the clock.
