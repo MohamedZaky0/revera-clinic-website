@@ -787,7 +787,7 @@ Required: `name`, `mobile`. If `id` is present, updates the existing customer. O
 
 Deletes a customer profile record. **Added 2026-09-30 (was missing):** both soft and hard delete
 require `requireSuperadminAccess` — an `admin` is refused (since commit `0976a72`, 2026-09-10; see
-`SECURITY.md` and `RISKS.md` RISK-078). Nullifies references in `reservations` to prevent foreign key violations, and deletes the linked account in Supabase Auth if applicable.
+`SECURITY.md` and `RISKS.md` RISK-078). **Changed 2026-10-25 (DEC-128, RISK-133):** `mode=hard` no longer un-links bookings. It answers `409` `{ error, code: "PATIENT_HAS_HISTORY", blockers: { bookings, payments, packages, walletEntries, productBalances, laserSessions, clinicalRecords } }` and changes nothing when the patient has any of those; `404` when the patient does not exist; `500` if the database removed no row. Otherwise it deletes the row and then the linked Supabase Auth user (by `auth_user_id`, else by e-mail/phone; never a staff login). An id of the form `res-cust-<phone>` (a patient shown only because of bookings, no row) answers `409` `PATIENT_IS_BOOKING_DERIVED` with `blockers.bookings`, for soft and hard alike; `400` for any other non-UUID id. `mode=soft` answers `404` when the patient does not exist.
 
 **Response:** `{ message: "Customer deleted successfully" }`
 

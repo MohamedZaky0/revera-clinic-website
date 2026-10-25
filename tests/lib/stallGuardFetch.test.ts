@@ -81,4 +81,28 @@ describe('createStallGuardFetch (RISK-131)', () => {
     expect(await p).toBe('aborted');
     expect(base).toHaveBeenCalledTimes(1);
   });
+
+  it('tells the log each time it cuts a read, with host and path but never the query string', async () => {
+    const base = hangingFetch();
+    base.mockImplementationOnce(base.getMockImplementation()!);
+    base.mockImplementationOnce(() => Promise.resolve(new Response('ok')));
+    const onRetry = vi.fn();
+    const guarded = createStallGuardFetch({ baseFetch: base as any, stallMs: 500, retries: 2, onRetry });
+    const p = guarded('https://abc.supabase.co/rest/v1/customers?email=eq.someone@example.com&select=*');
+    await vi.advanceTimersByTimeAsync(501);
+    await p;
+    expect(onRetry).toHaveBeenCalledTimes(1);
+    expect(onRetry).toHaveBeenCalledWith({ url: 'abc.supabase.co/rest/v1/customers', attempt: 1, stalled: true });
+  });
+
+  it('by default waits 3.5 s per try and repeats 3 times (worst case 14 s, under the 25 s limit)', async () => {
+    const base = hangingFetch();
+    const guarded = createStallGuardFetch({ baseFetch: base as any });
+    const p = guarded('https://x.test/a').then(() => 'resolved', (e) => String(e.message ?? e));
+    await vi.advanceTimersByTimeAsync(3499);
+    expect(base).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(3 * 3500 + 10);
+    expect(await p).toMatch(/stalled for 3500 ms/);
+    expect(base).toHaveBeenCalledTimes(4);
+  });
 });

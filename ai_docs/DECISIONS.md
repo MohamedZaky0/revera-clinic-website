@@ -3931,12 +3931,42 @@ into this app for the production environment.
 
 **Limits:** several screens still call `supabase.auth.getSession()` directly instead of `getAuthHeaders()`; they were not changed. A computer whose clock is wrong still refreshes about every 30 seconds through Supabase's own timer, which is well under the limit.
 
-## DEC-126: Server Reads To Supabase Are Cut After 8 Seconds And Asked Again; Writes Are Never Repeated
+## DEC-126: Server Reads To Supabase Are Cut After 3.5 Seconds And Asked Again; Writes Are Never Repeated
 
 **Date:** 2026-10-25 · **Status:** Done on dev; not yet on production · **Related:** RISK-131
 
-**Decision:** `supabaseServer` (`src/lib/supabaseServer.ts`) uses `createStallGuardFetch()` (`src/lib/stallGuardFetch.ts`): a GET or HEAD that has not answered within 8 s is aborted and sent again, up to 2 more times, also after a dropped connection (`TypeError`). POST, PATCH, PUT and DELETE are passed through untouched and never repeated, because a stalled write may already have been applied and a second one would duplicate it. A cancellation by the caller is respected. In the admin page, the `/api/auth/me` check carries a 10 s timeout, so a stalled answer becomes the existing network-failure retry (1 s, 3 s) instead of a minute of "Verifying administrator session...".
+**Decision:** `supabaseServer` and the auth check in `src/middleware.ts` (`src/lib/supabaseServer.ts`) uses `createStallGuardFetch()` (`src/lib/stallGuardFetch.ts`): a GET or HEAD that has not answered within 3.5 s is aborted and sent again, up to 3 more times (worst case 14 s; first version used 8 s and 2 repeats, which on 2026-10-25 still ran into 24 s because several tries in a row stalled), also after a dropped connection (`TypeError`). POST, PATCH, PUT and DELETE are passed through untouched and never repeated, because a stalled write may already have been applied and a second one would duplicate it. A cancellation by the caller is respected. In the admin page, the `/api/auth/me` check carries a 10 s timeout, so a stalled answer becomes the existing network-failure retry (1 s, 3 s) instead of a minute of "Verifying administrator session...".
 
 **Why:** RISK-131. Most requests take 0.2 s and a few stall for 20-45 s or until the platform kills the function at 25 s; a repeat nearly always succeeds at once. A read is the same read twice, so repeating it is safe.
 
-**Cost / limits:** a read that legitimately needs more than 8 s to start answering now fails after about 24 s instead of succeeding (no such read is known; reports and lists answer in well under a second). Writes can still stall; the person sees an error and retries. This hides the symptom, it does not find the cause.
+**Cost / limits:** a read that legitimately needs more than 3.5 s to start answering now fails after about 14 s instead of succeeding (no such read is known; reports and lists answer in well under a second). Writes can still stall; the person sees an error and retries. This hides the symptom, it does not find the cause.
+
+## DEC-127: The Open Patient Profile Has One Writer For Its Money Numbers (Derived Stored-vs-Bookings Value)
+
+**Date:** 2026-10-25 · **Status:** Done on dev; not yet on production · **Related:** RISK-132, DEC-121
+
+**Decision:** while the Patient Profile drawer is open, its Total Spend, Outstanding, Wallet and booking count are written by exactly one effect, `useOpenProfileFinancialSync` (`src/components/admin/patients/useOpenProfileFinancialSync.ts`), called in `src/app/admin/page.tsx` right after the derived `customers` memo. It copies the row of the derived list (stored value vs what the bookings say, DEC-121), and writes only when something differs. The older effect that copied the RAW stored `dbCustomers` record into the same state was removed.
+
+**Why:** RISK-132. The two effects disagreed whenever a patient's stored figures differ from the calculated ones, so each undid the other on every render and the numbers flickered for as long as the drawer stayed open. DEC-121 had added the derived writer without removing the raw one that came from an earlier fix the same day.
+
+**Rule for future work:** do not add another code path that writes `spent_amount` / `spent` / `outstanding` / `wallet_balance` of `viewingCustomerProfile` from a different source. `tests/lib/profileFinancialWriters.test.ts` fails if the raw writer returns.
+
+**Limits:** after a manual "Adjust financials" the drawer shows the typed values only until the next sync; the sync then shows the derived value of the refreshed list (which is the same number once the save has been read back). Not changed here.
+
+## DEC-128: Permanent Delete Of A Patient Is Refused While Bookings, Payments Or Other History Hang Off It; The Reason Is Named
+
+**Date:** 2026-10-25 · **Status:** Done on dev (branch `fix/patient-hard-delete`); not yet on production · **Related:** RISK-133, DEC-074 (reservation-derived patients), PRODUCT_RULES "Deletion Rules"
+
+**Decision:** `DELETE /api/customers?id=X&mode=hard` (superadmin only, unchanged) now:
+1. answers `404` if the patient row does not exist (it used to answer "deleted successfully" for nothing);
+2. counts what hangs off the patient (`src/lib/customerDeletion.ts`): bookings (`reservations`), payment records (`transactions` + `invoices` + `product_sales`), packages (`customer_packages`), wallet entries (`wallet_txns`), product balances (`customer_product_balances`), laser sessions (`laser_pulse_logs`) and clinical records (`medical_records` + `medical_reports` + `prescriptions`). If any is non-zero it answers `409` with `code: PATIENT_HAS_HISTORY`, a `blockers` object with the counts, and a plain sentence ("they have 2 bookings and 3 payment records ... use Soft Delete"). Nothing is changed;
+3. otherwise deletes the row with `.select('id')` and answers `500` ("removed no rows") if no row was really removed, so a blocked write can never again be reported as success;
+4. removes the patient's login (Auth user) only after the row is gone (before, a failed row delete had already cost the patient their login). It uses `customers.auth_user_id` when set, falls back to the old phone/e-mail match otherwise, and never removes a login that belongs to an `employee_accounts` row.
+
+A patient that exists only in the list because of bookings (`res-cust-<phone>`, DEC-074) has no `customers` row. For those, hard and soft delete answer `409` with `code: PATIENT_IS_BOOKING_DERIVED` and the number of bookings: "delete or cancel those bookings from the Bookings screen and the entry disappears" (`404` if no booking is left, `400` if the id has no usable phone). Soft delete of a real patient now answers `404` instead of an obscure `500` when the row is missing. The two descriptions in the Delete Customer dialog (`src/app/admin/page.tsx`) no longer promise that "linked appointments are unlinked".
+
+**Why:** RISK-133. Every table pointing at `customers` is `ON DELETE SET NULL` (reservations, transactions, invoices, product_sales) or `ON DELETE CASCADE` (everything else), so Postgres never refuses. The old route therefore un-linked the bookings and deleted the row; the Patients list then rebuilt the same patient from those bookings' name and phone, so "Hard Delete" looked like it did nothing. On the clinic side, a payment or visit can no longer lose its patient link by accident, and the person deleting is told what is in the way.
+
+**Not changed on purpose (business decision, see RISK-133):** the rule is the safe one. A permanent delete that also removes the patient's bookings and payments (what the old dialog text implied) would erase income and visit records, so it was not built. Soft Delete (Deactivate) remains the way to hide a patient who has history. No migration: the foreign keys are left as they are.
+
+**Tests:** `tests/routes/customers-hard-delete.test.ts` (15 cases, 11 of which failed before the change). Manual checklist: `ai_docs/manual_tests/PATIENT_HARD_DELETE_MANUAL_TESTS.md`.

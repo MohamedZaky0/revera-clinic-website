@@ -44,6 +44,7 @@ import CustomerFormModal from "@/components/admin/patients/CustomerFormModal";
 import PatientsDirectoryView from "@/components/admin/patients/PatientsDirectoryView";
 import CustomerProfileDrawer from "@/components/admin/patients/CustomerProfileDrawer";
 import { useCustomerProfile } from "@/components/admin/patients/useCustomerProfile";
+import { useOpenProfileFinancialSync } from "@/components/admin/patients/useOpenProfileFinancialSync";
 import BookingDetailsModal, { checkIsLaserService, parseAdditionalServiceLine, extractPrimaryPulses } from "@/components/admin/bookings/BookingDetailsModal";
 import { extractPulsePackageQuota } from "@/lib/laserDeficit";
 import { totalPaidFromBookings, totalOutstandingFromBookings } from "@/lib/patientSpend";
@@ -3287,38 +3288,10 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     showConfirm,
   });
 
-  // The profile drawer's Financial Summary banner (Total Spend/Wallet/Outstanding) reads from
-  // this local `viewingCustomerProfile` object, set once when the drawer opens. Actions taken
-  // while it stays open — Add Previous Booking, package sales, wallet adjustments — only
-  // refresh the master `dbCustomers` list via fetchCustomers(), so the banner kept showing
-  // stale totals (e.g. "Total Spend: 0" right after a historical payment was recorded) until
-  // the drawer was closed and reopened. Re-sync its financial fields whenever the master list
-  // updates and this customer's numbers have actually changed.
-  useEffect(() => {
-    if (!viewingCustomerProfile?.id) return;
-    const fresh = dbCustomers.find((c) => String(c.id) === String(viewingCustomerProfile.id));
-    if (!fresh) return;
-    const changed =
-      fresh.spent_amount !== viewingCustomerProfile.spent_amount ||
-      fresh.outstanding !== viewingCustomerProfile.outstanding ||
-      fresh.wallet_balance !== viewingCustomerProfile.wallet_balance ||
-      fresh.number_of_bookings !== viewingCustomerProfile.number_of_bookings;
-    if (changed) {
-      setViewingCustomerProfile((prev: any) =>
-        prev
-          ? {
-              ...prev,
-              spent_amount: fresh.spent_amount,
-              spent: fresh.spent_amount,
-              outstanding: fresh.outstanding,
-              wallet_balance: fresh.wallet_balance,
-              wallet: fresh.wallet_balance,
-              number_of_bookings: fresh.number_of_bookings,
-            }
-          : prev
-      );
-    }
-  }, [dbCustomers, viewingCustomerProfile, setViewingCustomerProfile]);
+  // NOTE (DEC-127): the open profile's money fields are synced by exactly ONE writer, the
+  // useOpenProfileFinancialSync call placed after the derived `customers` memo below. An earlier
+  // effect here copied the raw stored `dbCustomers` record into the same state and fought it,
+  // making Total Spend / Outstanding flicker. Do not add another writer.
 
   useEffect(() => {
     if (activeNav === "Inventory" || activeNav === "Products" || activeNav === "Patients" || viewingCustomerProfile) {
@@ -4133,35 +4106,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   // bookings say was paid and is still owed), NOT from the raw `dbCustomers` record. Copying the raw
   // spent_amount / outstanding here overwrote the calculated figures with the stored ones on every open,
   // so a patient who had paid showed Total Spend 0 on the card while the list showed the right number.
-  useEffect(() => {
-    if (!viewingCustomerProfile?.id) return;
-    const fresh = customers.find((c) => String(c.id) === String(viewingCustomerProfile.id)) as any;
-    if (!fresh) return;
-    const spent = Number(fresh.spent || 0);
-    const outstanding = Number(fresh.outstanding || 0);
-    const wallet = Number(fresh.wallet_balance ?? fresh.wallet ?? 0);
-    const changed =
-      spent !== Number(viewingCustomerProfile.spent_amount || 0) ||
-      spent !== Number(viewingCustomerProfile.spent || 0) ||
-      outstanding !== Number(viewingCustomerProfile.outstanding || 0) ||
-      wallet !== Number(viewingCustomerProfile.wallet_balance || 0) ||
-      fresh.number_of_bookings !== viewingCustomerProfile.number_of_bookings;
-    if (changed) {
-      setViewingCustomerProfile((prev: any) =>
-        prev
-          ? {
-              ...prev,
-              spent_amount: spent,
-              spent,
-              outstanding,
-              wallet_balance: wallet,
-              wallet,
-              number_of_bookings: fresh.number_of_bookings,
-            }
-          : prev
-      );
-    }
-  }, [customers, viewingCustomerProfile, setViewingCustomerProfile]);
+  //
+  // DEC-127: this is the ONLY writer of those fields (see useOpenProfileFinancialSync.ts).
+  useOpenProfileFinancialSync(customers, viewingCustomerProfile, setViewingCustomerProfile);
 
   const todaysBookingsCount = useMemo(() => {
     const getLocalDateString = (d: Date) => {
@@ -9701,7 +9648,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                         <span className="text-[9px] font-bold uppercase bg-rose-200/70 text-rose-900 px-2 py-0.5 rounded-full">Irreversible</span>
                       </div>
                       <p className="text-[11px] text-rose-900/80 mt-0.5">
-                        Permanently removes this profile from the database. Linked appointments are unlinked.
+                        Permanently removes this profile. Only allowed for a patient with no bookings, payments, packages, wallet or medical history; otherwise it tells you what blocks it. Use Soft Delete to keep the history.
                       </p>
                     </div>
                   </button>
@@ -9709,7 +9656,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               </div>
             ) : (
               <p className="text-xs text-[var(--color-brand-secondary)] mb-5 leading-relaxed">
-                This action will permanently delete the customer profile. Linked reservations will be set to guest status.
+                This action will permanently delete the customer profile. It is refused if the patient has bookings, payments, packages, wallet or medical history.
               </p>
             )}
 

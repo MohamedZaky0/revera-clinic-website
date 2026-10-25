@@ -3,6 +3,7 @@ import { supabaseServer } from '@/lib/supabaseServer';
 import { requireAdministratorAccess, requireAuthenticatedUser, requireStaffAccess, requireSuperadminAccess, type StaffAccess } from '@/lib/access';
 import { isOwnIdentity, normalizeEgyptMobile } from '@/lib/customerIdentity';
 import { recordWalletMovement, setAbsoluteWalletBalance } from '@/lib/wallet';
+import { UUID_REGEX, countPatientHistory, derivedPhoneFragment, describeBlockers, hasBlockingHistory } from '@/lib/customerDeletion';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -331,68 +332,144 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: 'Customer ID is required' }, { status: 400 });
     }
 
+    // The Patients list also shows "patients" that exist only because a booking carries their name
+    // and phone (id `res-cust-<phone>`). There is no customers row behind those, so there is nothing
+    // to delete or deactivate: the entry goes away when its bookings do (DEC-128 / RISK-133).
+    if (!UUID_REGEX.test(id)) {
+      const fragment = derivedPhoneFragment(id);
+      if (!fragment) {
+        return NextResponse.json(
+          { error: 'This entry has no patient record and no phone number to trace its bookings by. Find its bookings in the Bookings screen and delete them there.' },
+          { status: 400 }
+        );
+      }
+      const { data: orphanBookings, error: orphanErr } = await supabaseServer
+        .from('reservations')
+        .select('id')
+        .is('customer_id', null)
+        .ilike('phone', `%${fragment}`);
+      if (orphanErr) throw orphanErr;
+      const bookings = Array.isArray(orphanBookings) ? orphanBookings.length : 0;
+      if (bookings === 0) {
+        return NextResponse.json({ error: 'This patient no longer exists. Refresh the list.' }, { status: 404 });
+      }
+      return NextResponse.json(
+        {
+          error:
+            `This patient has no patient record. It only appears in the list because of ${bookings} ${bookings === 1 ? 'booking' : 'bookings'} ` +
+            `that carry this name and phone number, so there is nothing to ${mode === 'soft' ? 'deactivate' : 'delete'} here. ` +
+            `Delete or cancel ${bookings === 1 ? 'that booking' : 'those bookings'} from the Bookings screen and the entry disappears.`,
+          code: 'PATIENT_IS_BOOKING_DERIVED',
+          blockers: { bookings },
+        },
+        { status: 409 }
+      );
+    }
+
     if (mode === 'soft') {
       const { data: updated, error: softErr } = await supabaseServer
         .from('customers')
         .update({ active: false })
         .eq('id', id)
         .select()
-        .single();
+        .maybeSingle();
 
       if (softErr) throw softErr;
+      if (!updated) {
+        return NextResponse.json({ error: 'Patient not found. Refresh the list.' }, { status: 404 });
+      }
       return NextResponse.json({ message: 'Customer soft-deleted (deactivated) successfully', data: updated });
     }
 
-    // 1. Fetch customer email and mobile before deleting them
+    // 1. The patient must exist, otherwise "deleted successfully" would be a lie.
     const { data: customer, error: fetchError } = await supabaseServer
       .from('customers')
-      .select('email, mobile')
+      .select('email, mobile, auth_user_id')
       .eq('id', id)
       .maybeSingle();
 
     if (fetchError) throw fetchError;
+    if (!customer) {
+      return NextResponse.json({ error: 'Patient not found. Refresh the list.' }, { status: 404 });
+    }
 
-    if (customer) {
-      // 2. Lookup and delete from Supabase Auth
-      try {
+    // 2. Refuse while any history hangs off the patient. Postgres would not: it un-links bookings
+    //    and payments and wipes the rest, and the un-linked bookings rebuild the patient in the list.
+    const blockers = await countPatientHistory(id);
+    if (hasBlockingHistory(blockers)) {
+      return NextResponse.json(
+        {
+          error:
+            `This patient cannot be permanently deleted: they have ${describeBlockers(blockers)}. ` +
+            'Permanent delete is only for a patient with no bookings, payments, packages, wallet or medical history. ' +
+            'Use Soft Delete (Deactivate) to hide the patient and keep that history.',
+          code: 'PATIENT_HAS_HISTORY',
+          blockers,
+        },
+        { status: 409 }
+      );
+    }
+
+    // 3. Delete the row and check that a row was really removed.
+    const { data: removed, error: deleteError } = await supabaseServer
+      .from('customers')
+      .delete()
+      .eq('id', id)
+      .select('id');
+
+    if (deleteError) {
+      if ((deleteError as any).code === '23503') {
+        return NextResponse.json(
+          { error: 'This patient is still referenced by other records and cannot be permanently deleted. Use Soft Delete (Deactivate) instead.', code: 'PATIENT_HAS_HISTORY' },
+          { status: 409 }
+        );
+      }
+      throw deleteError;
+    }
+    if (!Array.isArray(removed) || removed.length === 0) {
+      return NextResponse.json(
+        { error: 'The patient could not be deleted: the database removed no rows. Nothing was changed.' },
+        { status: 500 }
+      );
+    }
+
+    // 4. Only now remove the patient's login, so a refused or failed delete never costs them access.
+    //    Best effort: the patient row is already gone and a leftover login does no harm.
+    try {
+      let authUserId: string | null = customer.auth_user_id || null;
+      if (!authUserId) {
         const { data: { users }, error: listError } = await supabaseServer.auth.admin.listUsers({
           perPage: 1000
         });
         if (!listError && users) {
-          const authUser = users.find((u: any) =>
+          const match = users.find((u: any) =>
             (customer.email && u.email?.toLowerCase() === customer.email.toLowerCase()) ||
             (customer.mobile && u.phone === customer.mobile) ||
             (customer.mobile && u.phone === `+20${customer.mobile.startsWith('0') ? customer.mobile.slice(1) : customer.mobile}`)
           );
+          authUserId = match?.id || null;
+        }
+      }
 
-          if (authUser) {
-            console.log(`Deleting auth user: ${authUser.id} for email ${authUser.email}`);
-            const { error: deleteAuthError } = await supabaseServer.auth.admin.deleteUser(authUser.id);
-            if (deleteAuthError) {
-              console.error(`Failed to delete auth user ${authUser.id}:`, deleteAuthError);
-            }
+      if (authUserId) {
+        // Never remove a staff login, whatever the phone or email matching found.
+        const { data: staffRow } = await supabaseServer
+          .from('employee_accounts')
+          .select('id')
+          .eq('auth_user_id', authUserId)
+          .maybeSingle();
+        if (staffRow) {
+          console.warn(`DELETE /api/customers: not removing auth user ${authUserId}, it belongs to a staff account`);
+        } else {
+          const { error: deleteAuthError } = await supabaseServer.auth.admin.deleteUser(authUserId);
+          if (deleteAuthError) {
+            console.error(`Failed to delete auth user ${authUserId}:`, deleteAuthError);
           }
         }
-      } catch (authErr) {
-        console.error("Error looking up/deleting auth user:", authErr);
       }
+    } catch (authErr) {
+      console.error('Error looking up/deleting auth user:', authErr);
     }
-
-    // 3. Set customer_id to null in all reservations referencing this customer to avoid foreign key violation
-    const { error: updateError } = await supabaseServer
-      .from('reservations')
-      .update({ customer_id: null })
-      .eq('customer_id', id);
-
-    if (updateError) throw updateError;
-
-    // 4. Delete the customer
-    const { error: deleteError } = await supabaseServer
-      .from('customers')
-      .delete()
-      .eq('id', id);
-
-    if (deleteError) throw deleteError;
 
     return NextResponse.json({ message: 'Customer permanently deleted successfully' });
   } catch (err: any) {

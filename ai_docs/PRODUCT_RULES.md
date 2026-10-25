@@ -1,6 +1,8 @@
 # PRODUCT_RULES.md — Revera Clinics Business Rules (Enforced in Code)
 
-> **Last Updated:** 2026-07-30
+> **Last Updated:** 2026-10-21 (the deletion rules corrected, and a closing section added for DEC-113 to DEC-121 and RISK-128; the rest of the file was last reviewed 2026-07-30 and has **not** been re-verified line by line)
+> **Known issue found in the 2026-10-21 audit:** the sections from "Financial Transactions & Manual Ledger Rules" to "Reception Dashboard Shift Lifecycle & Operational Rules" appear twice (about lines 314–513 and 514–717) with small differences in a few lines. Merge them in a dedicated pass; until then treat a rule as valid if the code agrees with either copy, and check the code.
+> **Last full pass:** 2026-07-30
 > **Source:** Confirmed from live code only — no speculation
 > **2026-07-30 Update:** Added Doctor & Receptionist Session Workflows, Patient Medical Records Intake Requirements, Session Products & Pulses calculation, and Admin Customer Balances formulas.
 
@@ -465,14 +467,19 @@ The following are **not currently enforced in code**:
 
 ---
 
-## Superadmin Dual Deletion Engine (Soft Delete vs Hard Delete)
-**Enforced in:** `src/contexts/AlertConfirmContext.tsx`, `src/app/api/customers/route.ts`, `src/app/api/employees/route.ts`, `src/app/api/providers/route.ts`, `src/app/api/services/route.ts`, `src/app/api/reservations/route.ts`, `src/app/admin/page.tsx`.
+## Deletion Rules (Soft Delete vs Hard Delete) — who may delete what
+**Enforced in:** `src/contexts/AlertConfirmContext.tsx`, `src/app/api/customers/route.ts`, `src/app/api/employees/route.ts`, `src/app/api/providers/route.ts`, `src/app/api/services/route.ts`, `src/app/api/reservations/route.ts`, `src/lib/accountActivation.ts`, `src/app/admin/page.tsx`. **Updated 2026-10-21** (the old text said every delete was superadmin-only; employee accounts no longer are, DEC-117).
 
-1. **Dual Deletion Options for Super Administrators**:
-   - When a Super Admin triggers a delete action on core entities (Patients, Employees, Doctors, Services, Bookings), they are presented with two explicit choices:
-     - **Soft Delete (Deactivate / Archive)**: Deactivates and archives the record while preserving all associated financial transactions, historical bookings, medical reports, prescriptions, invoices, and audit logs.
-     - **Hard Delete (Permanent Removal)**: Permanently purges the record from Supabase tables and auth systems.
-2. **Automated Diagnostic Verification**:
+1. **Who may delete** (the server decides; the screens only hide the buttons):
+   - **Patients** (`customers`) and **bookings** (`reservations`): superadmin only, soft or hard.
+   - **Doctors** (`providers`): superadmin only (the granular `providers.delete` path alone is not enough).
+   - **Services**: staff holding the `services.delete` permission.
+   - **Employee accounts**: any administrator (admin or superadmin), but never a superadmin account and never your own account (`checkAccountAction`). There is always an active administrator left, because the caller is one.
+2. **Two kinds of delete** where both exist:
+   - **Soft Delete (Deactivate / Archive)**: keeps all associated financial transactions, historical bookings, medical reports, prescriptions, invoices and audit logs. For an employee account this now means **Inactive**: the role and records are kept, the Supabase Auth user is banned, the account has no access to anything, and it can be switched back on (DEC-117). It no longer overwrites the role with `inactive`.
+   - **Hard Delete (Permanent Removal)**: permanently removes the record from Supabase tables and, for an employee, the Auth user. **A patient** can be hard-deleted only when nothing hangs off it: no bookings, payment records (transactions, invoices, product sales), packages, wallet entries, product balances, laser sessions, medical records, medical reports or prescriptions. Otherwise the server answers `409` naming what blocks it and changes nothing; use Soft Delete (DEC-128). Reason: those tables un-link or wipe silently when the patient row goes, and the un-linked bookings rebuild the patient in the Patients list. A patient shown only because of bookings (`res-cust-<phone>`, no patient record) has nothing to delete: delete or cancel its bookings from the Bookings screen.
+3. **An inactive account takes its doctor off the booking lists** (DEC-118): switching an account off, soft-deleting it, or deleting it sets the matching `providers.active` to false (the provider row and its bookings are kept); switching it back on sets it to true. The match is a unique case-insensitive name, narrowed by phone; if it is ambiguous nothing changes and the response says `providerSync: "ambiguous"`.
+4. **Automated Diagnostic Verification**:
    - Verified under System Test Suite test case `TC-048` (`Superadmin Dual Delete (Soft vs Hard) & Core System Role Locking Engine`).
 
 ---
@@ -664,14 +671,19 @@ The following are **not currently enforced in code**:
 
 ---
 
-## Superadmin Dual Deletion Engine (Soft Delete vs Hard Delete)
-**Enforced in:** `src/contexts/AlertConfirmContext.tsx`, `src/app/api/customers/route.ts`, `src/app/api/employees/route.ts`, `src/app/api/providers/route.ts`, `src/app/api/services/route.ts`, `src/app/api/reservations/route.ts`, `src/app/admin/page.tsx`.
+## Deletion Rules (Soft Delete vs Hard Delete) — who may delete what
+**Enforced in:** `src/contexts/AlertConfirmContext.tsx`, `src/app/api/customers/route.ts`, `src/app/api/employees/route.ts`, `src/app/api/providers/route.ts`, `src/app/api/services/route.ts`, `src/app/api/reservations/route.ts`, `src/lib/accountActivation.ts`, `src/app/admin/page.tsx`. **Updated 2026-10-21** (the old text said every delete was superadmin-only; employee accounts no longer are, DEC-117).
 
-1. **Dual Deletion Options for Super Administrators**:
-   - When a Super Admin triggers a delete action on core entities (Patients, Employees, Doctors, Services, Bookings), they are presented with two explicit choices:
-     - **Soft Delete (Deactivate / Archive)**: Deactivates and archives the record while preserving all associated financial transactions, historical bookings, medical reports, prescriptions, invoices, and audit logs.
-     - **Hard Delete (Permanent Removal)**: Permanently purges the record from Supabase tables and auth systems.
-2. **Automated Diagnostic Verification**:
+1. **Who may delete** (the server decides; the screens only hide the buttons):
+   - **Patients** (`customers`) and **bookings** (`reservations`): superadmin only, soft or hard.
+   - **Doctors** (`providers`): superadmin only (the granular `providers.delete` path alone is not enough).
+   - **Services**: staff holding the `services.delete` permission.
+   - **Employee accounts**: any administrator (admin or superadmin), but never a superadmin account and never your own account (`checkAccountAction`). There is always an active administrator left, because the caller is one.
+2. **Two kinds of delete** where both exist:
+   - **Soft Delete (Deactivate / Archive)**: keeps all associated financial transactions, historical bookings, medical reports, prescriptions, invoices and audit logs. For an employee account this now means **Inactive**: the role and records are kept, the Supabase Auth user is banned, the account has no access to anything, and it can be switched back on (DEC-117). It no longer overwrites the role with `inactive`.
+   - **Hard Delete (Permanent Removal)**: permanently removes the record from Supabase tables and, for an employee, the Auth user. **A patient** can be hard-deleted only when nothing hangs off it: no bookings, payment records (transactions, invoices, product sales), packages, wallet entries, product balances, laser sessions, medical records, medical reports or prescriptions. Otherwise the server answers `409` naming what blocks it and changes nothing; use Soft Delete (DEC-128). Reason: those tables un-link or wipe silently when the patient row goes, and the un-linked bookings rebuild the patient in the Patients list. A patient shown only because of bookings (`res-cust-<phone>`, no patient record) has nothing to delete: delete or cancel its bookings from the Bookings screen.
+3. **An inactive account takes its doctor off the booking lists** (DEC-118): switching an account off, soft-deleting it, or deleting it sets the matching `providers.active` to false (the provider row and its bookings are kept); switching it back on sets it to true. The match is a unique case-insensitive name, narrowed by phone; if it is ambiguous nothing changes and the response says `providerSync: "ambiguous"`.
+4. **Automated Diagnostic Verification**:
    - Verified under System Test Suite test case `TC-048` (`Superadmin Dual Delete (Soft vs Hard) & Core System Role Locking Engine`).
 
 ---
@@ -1331,3 +1343,18 @@ Specifically, `amountLeft` in the `reservations` table MUST reflect the true unp
 - **Booking Creation Payment Method Selection**: `AdminNewBookingView.tsx` dynamically displays payment method buttons (Cash, Card, InstaPay, Vodafone Cash, Bank Transfer) and an optional transaction reference input whenever `amountPaidNow > 0`.
 - **Debt Settlement Automatic Ledger Recording**: When a patient settles debt via `POST /api/customers/settle-debt`, each allocated settlement automatically writes an `outstanding_payment` transaction with the specified payment method and reference number, immediately reducing patient debt and increasing today's net payments.
 - **System Test Suite**: Verified under `TC-102` in the Admin Settings System Test Suite.
+
+---
+
+## Rules added after the 2026-07-30 pass (DEC-113 to DEC-121, RISK-128)
+**Added 2026-10-21 from DECISIONS.md; the code references are in each decision.**
+
+1. **A role chooses its workspace** (DEC-113): `roles.workspace` is `standard` or `doctor`. Only a doctor-workspace role lands on the doctor screens; names and the department label decide nothing. Superadmin and accounts flagged `is_also_doctor` can switch between the admin view and the doctor view; other admins cannot (DEC-114).
+2. **Who counts as a doctor** is "the role's workspace is doctor, or `is_also_doctor` is true" (`isDoctorEmployee`). That drives the providers sync and the payroll split: such people are paid only through Doctor Payroll and are left out of staff payroll, so nobody is paid twice.
+3. **Shift overlap check** (DEC-115): an In-Clinic shift and an Online Consultation shift may overlap at the same branch (a doctor can take online consultations while available in the clinic). Overlaps between two in-clinic shifts, two online shifts, or any shifts at different branches still warn.
+4. **Inactive accounts** (DEC-117): `employee_accounts.is_active = false` means no access at all. The server refuses it in `requireStaffAccess`, `verifyHrAccess` and `/api/auth/me` (`code: account_inactive`), and a signed-in person is returned to login on their next request. Superadmin accounts cannot be switched off from the Employees screen.
+5. **Money on a booking row** (DEC-119): the row stores `amount_paid` and `amount_left` only. Paid = `amount_paid`; Outstanding = `amount_left`; Service Price = paid + left (for an "Add Previous Booking" entry the invoice value written in its notes wins). A blank balance shows a dash, never 0. Cancelled, rejected and no-show bookings show no service price and Outstanding 0. A package-covered session billed 0 reads "Covered by package".
+6. **A previous booking is shown at the price it was charged** (DEC-120): its Invoice Value is authoritative and is spread over the service lines in proportion to catalog prices (equally if the catalog gives no basis, the last line absorbing rounding). Each service appears once even though "Add Previous Booking" stores the extra services twice. Online and New Booking bookings still price from the catalog and stored amounts.
+7. **Patient Total Spend and Outstanding** (DEC-121): Total Spend is the sum of `amount_paid` over delivered bookings (approved, confirmed, completed, started). The patients list and the profile card show the larger of the stored `customers` figure and the figure calculated from bookings; Outstanding is the larger of the stored value and the sum of `amount_left` over completed bookings.
+8. **Staff see only their own profile data** (RISK-128): `/api/profile*` return the caller's own employee row, attendance and pay summary. Target progress sums `amount_paid` on the caller's own bookings in completed, confirmed, approved and started status (a doctor's: assigned to them; staff: created by them). The provider row is matched strictly (id, phone, national id or exact name; exactly one match or none).
+9. **The browser never reads tables with the public key** (RISK-128): every table has RLS on with no open policy, so any read from the browser returns nothing; reads go through authenticated API routes.
