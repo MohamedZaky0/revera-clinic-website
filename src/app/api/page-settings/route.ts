@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { requireAdministratorAccess, requireStaffAccess } from '@/lib/access';
 import { CLIENT } from '@/config/client';
+import { publicReadHeaders } from '@/lib/publicCache';
 import fs from 'fs';
 import path from 'path';
 
@@ -117,7 +118,10 @@ export async function GET(req?: Request) {
       .maybeSingle();
 
     if (!error && data) {
-      return NextResponse.json(filter(data.value));
+      // Only the stripped, anonymous variant of a real database read is shared-cacheable. A
+      // caller who sent ANY Authorization header (staff, or a bad/expired token) gets the
+      // uncached response, and the seeded-default / JSON-fallback bodies below are never cached.
+      return NextResponse.json(filter(data.value), { headers: publicReadHeaders(isStaff ? undefined : req) });
     } else if (!data) {
       // Seed default row in Supabase
       const { error: insertError } = await supabaseServer

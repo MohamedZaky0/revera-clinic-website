@@ -11,6 +11,7 @@ import type { Language, Direction, Translation } from "@/types";
 import { translations } from "@/lib/translations";
 import { WhatsappButton } from "@/components/WhatsappButton";
 import { isAdLandingPath } from "@/lib/landingPaths";
+import { getPublicPageSettings } from "@/lib/publicPageSettings";
 
 interface LanguageContextValue {
   language: Language;
@@ -86,9 +87,9 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     async function loadSettings() {
       if (isAdLandingPath(window.location.pathname)) return;
       try {
-        const res = await fetch("/api/page-settings", { cache: "no-store" });
-        if (res.ok) {
-          const homeSettings = await res.json();
+        // RISK-137: shared with Navbar/BookingModal, so one page view makes one request.
+        const homeSettings = await getPublicPageSettings();
+        if (homeSettings !== null) {
           if (homeSettings) {
             setDynamicTranslations(prev => {
               const updated = { ...prev };

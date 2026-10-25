@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { getSupabaseServer } from '@/lib/supabaseServer';
 import { requireStaffAccess } from '@/lib/access';
+import { publicReadHeaders } from '@/lib/publicCache';
 
 function mapCategoryRow(r: any) {
   return {
@@ -31,7 +32,7 @@ export async function GET(req: Request) {
       .order('sort_order', { ascending: true });
 
     if (error) throw error;
-    return NextResponse.json((data || []).map(mapCategoryRow));
+    return NextResponse.json((data || []).map(mapCategoryRow), { headers: publicReadHeaders(req) });
   } catch (err) {
     console.error('GET /api/categories error:', err);
     return NextResponse.json([]);

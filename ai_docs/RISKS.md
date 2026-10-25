@@ -1270,6 +1270,7 @@ filled in with the above.
 - [RISK-134](#risk-134) — Every Staff Request Asked The Supabase Auth Server To Check The Login, About 68,000 Auth Requests An Hour, Which Helped Keep The Production Database Unhealthy (RESOLVED ON DEV, NOT YET CONFIRMED ON PRODUCTION)
 - [RISK-135](#risk-135) — Doctors > Attendance Sent The Same Request Over And Over While The Tab Was Open (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER)
 - [RISK-136](#risk-136) — Admin Tabs Polled The Server Around The Clock, Hidden Or Not, And Staff Without Admin Rights Asked For Admin-Only Lists On Every Click (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
+- [RISK-137](#risk-137) — Every Public Page View Cost About 12 API Calls And 15 Database Queries, Nothing Was Cached, And The Booking Popup Loaded Six Reads On Pages That Never Show It (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
 
 ## RISK-003: Patient Auth Is Non-Functional
 
@@ -5762,3 +5763,37 @@ See `PROPOSALS.md` for:
 **Tests:** `tests/components/visiblePoll.test.tsx` (interval, hidden tab makes no call and no timer, one refetch on visible, quick alt-tab does not refetch, in-flight guard, disabled poll), `tests/lib/adminDirectory.test.ts` (no request for non-admin roles, no retry after 401/403, one retry otherwise), `tests/lib/pausedPollingWiring.test.ts` (source wiring of the three call sites, since the admin page is too large to mount), and the cadence tests in `tests/components/doctor/DoctorAccountView.test.tsx` were updated from 3 s to 15 s.
 
 **Still to do:** confirm in a real browser with the Network tab (checklist) and, after a deploy, in the Supabase Auth and Vercel request metrics over a day.
+
+## RISK-137: Every Public Page View Cost About 12 API Calls And 15 Database Queries, Nothing Was Cached, And The Booking Popup Loaded Six Reads On Pages That Never Show It (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
+
+**Manual test checklist:** `ai_docs/manual_tests/PUBLIC_READ_CACHING_MANUAL_TESTS.md`
+
+**Severity:** Medium (no wrong data; load on a Nano database that was already unhealthy, see RISK-134) · **Type:** Performance / database load
+**Found:** 2026-10-25, by a code audit. The counts below are counted from the code, not measured on production.
+
+**Cause:**
+- `GlobalBookingModal` is mounted in `src/app/layout.tsx`, so `BookingModal` ran six fetches on mount of every page, `/admin` and `/login` included, while the popup was closed: categories, services, branches, providers, page-settings, terms.
+- `/api/page-settings` was fetched three times per page view (`LanguageProvider`, `Navbar`, `BookingModal`), and `Navbar` fetched it again on every window `focus` and every `visibilitychange`.
+- Every public GET route is `force-dynamic` and the client used `cache: "no-store"`, so every call reached the database. `GET /api/providers` is the heaviest (providers, roles, every non-rejected reservation, and `select *` on `employee_accounts`, which included the base64 national-id images of every employee).
+- Home page, estimate: 12 API calls before (page-settings x3, categories x2, services x3, branches, providers, terms, packages), about 15 PostgREST queries.
+
+**Fix:**
+1. `BookingModal` fetches its six reads only the first time the popup opens (or at once for the `/book` page variant). An "open-booking" event that arrives before categories and services are loaded is held and replayed when they are, so the preselected service and category still work.
+2. `src/lib/publicCache.ts` adds `Cache-Control: public, s-maxage=60, stale-while-revalidate=300` and `Vary: Authorization` to the successful GET of `services`, `categories`, `branches`, `packages`, `terms` and `page-settings`, only when the request carries no `Authorization` header. A request with any `Authorization` header (valid staff token, expired token, junk) gets `private, no-store`. For `page-settings` only the stripped anonymous body of a real database read is cacheable; the staff blob, the seeded-default body and the JSON-file fallback are not. Error and fallback bodies (500, the `[]` fallbacks of `branches` and `categories`) get no cache header. `dynamic = 'force-dynamic'` is kept: it controls Next's own caching and does not remove a `Cache-Control` set on the response.
+3. `cache: "no-store"` is removed from the public site's fetches of categories, services and packages (`HomeServicesSection`, `ServicesSection`, `PackagesSection`, `BookingModal`). Admin screens keep theirs.
+4. `src/lib/publicPageSettings.ts` is one shared read of `/api/page-settings` for `LanguageProvider`, `Navbar` and `BookingModal`: concurrent callers share one request, a copy is reused for 5 minutes, and it is dropped at once on the admin's `revera-settings-change` event, the cross-tab storage event and the `BroadcastChannel` message. `Navbar` no longer refetches on focus unless the copy is older than 5 minutes, and ignores `visibilitychange` to hidden.
+5. `GET /api/providers`: `employee_accounts` is read with the seven columns the auto-sync uses instead of `select *`.
+
+**Not changed on purpose:**
+- `GET /api/providers` is **not** given a cache header. It returns staff-only fields (`fixedSalary`, `nationalId`, `commission*`) to anyone, and the admin Doctors screen (`useProviderForm`) reads it without an `Authorization` header, so a public cache would also hand those fields to the CDN and a caller cannot be told apart as staff or public. For the same reason the per-doctor `bookings` count (a read of every non-rejected reservation) is kept: the staff Doctors table shows it.
+- `availability` (depends on live reservations), `rooms`, `service-rooms` and `customer-avatars` (patient id to photo map) are not cached; none is read on a normal public page view.
+
+**Impact now (estimate):** home page 12 calls become 5 (page-settings once, categories, services x2, packages) and, within 60 s of another visitor, those are answered by the CDN without a database query; any other page makes 1 call (page-settings), or 3 on the services page. Opening the booking popup adds 5 more on first open (page-settings reused). Window focus makes none inside 5 minutes.
+
+**New finding, not fixed here (follow-up, owner decision needed):** `GET /api/providers` exposes salary, national id and commission settings to any anonymous caller. Fixing it means sending the staff token from `useProviderForm` and returning a public subset otherwise.
+
+**Staleness (accepted):** a CMS edit (service, price, category, branch, package, terms, page settings) can take up to 60 s to reach visitors on a fresh page load. With `stale-while-revalidate` the first request after 60 s may still be answered with the old copy while the CDN refreshes (up to 300 s past expiry), and an already-open tab keeps its page-settings copy for up to 5 minutes (zero in the browser that made the save). Staff screens that read these routes WITH a token always get fresh data. Staff screens that read them without a token (for example the New Booking screen's `/api/packages`) can see a copy up to 60 s old after an edit.
+
+**Tests:** `tests/routes/public-read-caching.test.ts` (header on anonymous GET, absence with a junk token and with a staff token, unchanged JSON, no header on error or fallback, providers uncached), `tests/components/BookingModalLazyLoad.test.tsx` (no fetch on mount while closed, six on first open and none on the second, `/book` loads at once, deferred open is replayed), `tests/components/publicPageSettings.test.tsx` (shared in-flight request, 5-minute TTL, invalidation, no failure caching).
+
+**Still to do:** confirm on a Vercel preview that the response headers reach the browser and that `x-vercel-cache` shows HIT for the anonymous request; run the manual checklist.

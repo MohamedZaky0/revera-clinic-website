@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { getSupabaseServer } from '@/lib/supabaseServer';
 import { requireStaffAccess, hasGranularPermission } from '@/lib/access';
 import { getDurationInMinutes, getDurationLabel } from '@/lib/services';
+import { publicReadHeaders } from '@/lib/publicCache';
 
 function fmtCreatedAt(val: unknown): string {
   if (!val) return "";
@@ -101,7 +102,7 @@ export async function GET(req: Request) {
       .order('sort_order', { ascending: true });
 
     if (error) throw error;
-    return NextResponse.json((data || []).map(mapServiceRow));
+    return NextResponse.json((data || []).map(mapServiceRow), { headers: publicReadHeaders(req) });
   } catch (err: any) {
     console.error('GET /api/services error:', err);
     return NextResponse.json({ error: err?.message || 'Database error' }, { status: 500 });

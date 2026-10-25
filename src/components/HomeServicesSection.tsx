@@ -381,7 +381,7 @@ export function HomeServicesSection() {
 
   // Load categories and services directly from the database API
   useEffect(() => {
-    fetch("/api/categories", { cache: "no-store" })
+    fetch("/api/categories")
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => {
         if (Array.isArray(data)) {
@@ -392,7 +392,7 @@ export function HomeServicesSection() {
       })
       .catch(() => setDynamicCategories(getDynamicCategories()));
 
-    fetch("/api/services", { cache: "no-store" })
+    fetch("/api/services")
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => setDynamicServices(Array.isArray(data) ? data : []))
       .catch(() => setDynamicServices([]));

@@ -73,7 +73,12 @@ function mapProvider(p: Record<string, any>, bookingsCount: number = 0) {
   };
 }
 
- 
+
+// RISK-137: deliberately NOT given a shared-cache header. This response carries staff-only
+// fields (fixedSalary, nationalId, commission*) and is read by the admin Doctors screen WITHOUT an
+// Authorization header, so staff and public callers cannot be told apart here. The per-doctor
+// `bookings` count (every non-rejected reservation) is used by that staff screen, so it cannot be
+// dropped for anonymous callers without changing a staff-visible number.
 export async function GET() {
   try {
     // DEC-113: a "doctor employee" is one whose role has the doctor workspace.
@@ -89,7 +94,9 @@ export async function GET() {
         .neq('status', 'rejected'),
       supabaseServer
         .from('employee_accounts')
-        .select('*')
+        // Only what the auto-sync below reads. `select *` also pulled the base64 national-id
+        // images (national_id_front/back) of every employee on every public page view.
+        .select('name, phone, salary, branch_id, national_id, role_name, is_also_doctor')
         .not('role_name', 'is', null)
     ]);
     const docEmployeesRes = {

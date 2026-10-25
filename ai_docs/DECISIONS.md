@@ -4005,3 +4005,21 @@ A patient that exists only in the list because of bookings (`res-cust-<phone>`, 
 **Trade-off:** a doctor sees reception's changes up to 15 s later than before. Realtime does not reach the browser for reservations (row-level security), so there is no faster path today; a server-side doctor filter or a policy that lets realtime through would allow a shorter interval at lower cost.
 
 **Tests:** `tests/components/visiblePoll.test.tsx`, `tests/lib/adminDirectory.test.ts`, `tests/lib/pausedPollingWiring.test.ts`, `tests/components/doctor/DoctorAccountView.test.tsx` (cadence updated to 15 s). Manual checklist: `ai_docs/manual_tests/PAUSE_HIDDEN_POLLING_MANUAL_TESTS.md`.
+
+## DEC-131: Public Read Endpoints Get A 60-Second Shared Cache For Anonymous Callers Only; The Booking Popup Loads Its Data On First Open
+
+**Date:** 2026-10-25 · **Status:** Done on dev (branch `perf/cache-public-reads`); not yet on production · **Related:** RISK-137, RISK-067, RISK-134, DEC-129
+
+**Decision:**
+1. The successful GET of `services`, `categories`, `branches`, `packages`, `terms` and `page-settings` sends `Cache-Control: public, s-maxage=60, stale-while-revalidate=300` and `Vary: Authorization` when the request has no `Authorization` header. Any request with an `Authorization` header gets `private, no-store`. One helper (`src/lib/publicCache.ts`) makes that choice so no route can forget the rule.
+2. `page-settings` is shared-cacheable only as the anonymous, stripped variant of a database read. The staff blob, the seeded default and the file fallback are never cached.
+3. `providers` (staff-only fields, read by staff without a token), `availability`, `rooms`, `service-rooms` and `customer-avatars` are not cached.
+4. `BookingModal` loads its data on first open, not on mount. A page-settings read is shared by the language provider, the navbar and the popup, kept for 5 minutes, dropped on a settings-change event.
+
+**Why:** the public site put about 12 calls and 15 queries on a small database per page view and nothing was cached. A 60 s copy removes most of them and is short enough for a clinic CMS.
+
+**Rejected:** `s-maxage` on `providers` (would publish salaries and national ids from the CDN; the route has to be locked down first); caching keyed only by `Vary: Authorization` for staff (staff would still risk stale data after an edit, so they are `no-store`); a longer TTL (editors expect changes within a minute or so); `export const revalidate` in place of headers (the routes read the request and must stay dynamic); removing `force-dynamic`.
+
+**Accepted cost:** a CMS edit can take up to 60 s (plus the stale-while-revalidate window) to show to visitors.
+
+**Tests:** `tests/routes/public-read-caching.test.ts`, `tests/components/BookingModalLazyLoad.test.tsx`, `tests/components/publicPageSettings.test.tsx`. Manual checklist: `ai_docs/manual_tests/PUBLIC_READ_CACHING_MANUAL_TESTS.md`.

@@ -99,6 +99,8 @@ Starts or ends receptionist daily shift attendance persisted to `hr_attendance` 
 
 ## GET /api/branches
 
+**Cache (RISK-137 / DEC-131):** an anonymous GET answers `Cache-Control: public, s-maxage=60, stale-while-revalidate=300` and `Vary: Authorization`; a request with any `Authorization` header answers `private, no-store`. Error responses carry no cache header. A CMS edit can take up to 60 s to reach visitors.
+
 Returns all branches ordered by `sort_order`.
 
 **Response:** `Branch[]`
@@ -125,6 +127,8 @@ Deletes a branch by ID.
 
 ## GET /api/categories
 
+**Cache (RISK-137 / DEC-131):** an anonymous GET answers `Cache-Control: public, s-maxage=60, stale-while-revalidate=300` and `Vary: Authorization`; a request with any `Authorization` header answers `private, no-store`. Error responses carry no cache header. A CMS edit can take up to 60 s to reach visitors.
+
 Returns all categories ordered by `sort_order`.
 
 **Response:** `CategoryRow[]` — `{ key, en, ar, sortOrder }`
@@ -150,6 +154,8 @@ Deletes a category by its key.
 ---
 
 ## GET /api/services
+
+**Cache (RISK-137 / DEC-131):** an anonymous GET answers `Cache-Control: public, s-maxage=60, stale-while-revalidate=300` and `Vary: Authorization`; a request with any `Authorization` header answers `private, no-store`. Error responses carry no cache header. A CMS edit can take up to 60 s to reach visitors.
 
 Returns all services ordered by `sort_order`.
 
@@ -181,6 +187,8 @@ Deletes a service by numeric ID.
 ---
 
 ## GET /api/providers
+
+**Cache (RISK-137 / DEC-131):** deliberately **not** cached (no `Cache-Control`): the response carries staff-only fields (`fixedSalary`, `nationalId`, `commission*`) and the admin Doctors screen reads it without a token. `employee_accounts` is read with an explicit column list; the shape is unchanged.
 
 Returns all providers ordered by name. Auto-syncs any `employee_accounts` row that looks like a
 doctor (`department`/`role_name` matching `%doc%`) into `providers` if missing. Falls back to
@@ -241,6 +249,8 @@ delete require `requireSuperadminAccess` — an `admin` is refused, not just non
 ---
 
 ## GET /api/page-settings
+
+**Cache (RISK-137 / DEC-131):** only the stripped anonymous body of a database read is cached (`public, s-maxage=60, stale-while-revalidate=300`, `Vary: Authorization`). Any request with an `Authorization` header (the full staff blob included) answers `private, no-store`; the seeded-default and JSON-file fallback bodies carry no cache header.
 
 Returns the `value` JSONB of the `page_settings` row with `key='home'`. Seeds defaults if empty. Falls back to `data/page_settings.json` on DB error.
 
@@ -551,6 +561,8 @@ sensible defaults for missing ones).
 ---
 
 ## GET /api/packages
+
+**Cache (RISK-137 / DEC-131):** an anonymous GET answers `Cache-Control: public, s-maxage=60, stale-while-revalidate=300` and `Vary: Authorization`; a request with any `Authorization` header answers `private, no-store`. Error responses carry no cache header. A CMS edit can take up to 60 s to reach visitors.
 
 Public — no auth check, same convention as `GET /api/services` (returns everything unfiltered;
 active/`showOnWebsite` filtering for the public site happens client-side in `PackagesSection.tsx`).
@@ -2164,6 +2176,8 @@ Staff. Replaces a mapping set, in one of two shapes: `{ serviceId, roomIds: [...
 ## Terms and conditions
 
 ### GET /api/terms?active_only={true}
+
+**Cache (RISK-137 / DEC-131):** an anonymous GET answers `Cache-Control: public, s-maxage=60, stale-while-revalidate=300` and `Vary: Authorization`; a request with any `Authorization` header answers `private, no-store`. Error responses carry no cache header. A CMS edit can take up to 60 s to reach visitors.
 **Public** (the public Terms page). **Response:** `{ terms: [...] }`.
 
 ### POST /api/terms
