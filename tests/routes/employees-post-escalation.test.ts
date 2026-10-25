@@ -36,7 +36,7 @@ const mockDeleteUser = vi.fn();
 vi.mock('@/lib/supabaseServer', () => ({
   supabaseServer: {
     auth: {
-      getUser: (...args: any[]) => fake.authGetUser(...args),
+      getUser: (...args: any[]) => fake.authGetUser(...args), getClaims: (...args: any[]) => fake.authGetClaims(...args),
       admin: {
         createUser: (...args: any[]) => mockCreateUser(...args),
         inviteUserByEmail: (...args: any[]) => mockInviteUser(...args),

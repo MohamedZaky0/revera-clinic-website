@@ -34,7 +34,7 @@ const mockAuthGetUser = fake.authGetUser;
 
 vi.mock('@/lib/supabaseServer', () => ({
   supabaseServer: {
-    auth: { getUser: (...args: any[]) => fake.authGetUser(...args) },
+    auth: { getUser: (...args: any[]) => fake.authGetUser(...args), getClaims: (...args: any[]) => fake.authGetClaims(...args) },
     from: (table: string) => fake.client.from(table),
   },
 }));

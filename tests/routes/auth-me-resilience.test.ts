@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { claimsFromGetUser } from '../helpers/supabaseFake';
+import { clearTokenCache } from '@/lib/verifyToken';
 import { AuthRetryableFetchError } from '@supabase/supabase-js';
 
 const mockAuthGetUser = vi.fn();
@@ -18,7 +20,7 @@ function createChain(): any {
 
 vi.mock('@/lib/supabaseServer', () => ({
   supabaseServer: {
-    auth: { getUser: (...args: any[]) => mockAuthGetUser(...args) },
+    auth: { getUser: (...args: any[]) => mockAuthGetUser(...args), getClaims: (...args: any[]) => claimsFromGetUser(mockAuthGetUser)(args[0]) },
     from: (_table: string) => createChain(),
   },
 }));
@@ -36,6 +38,7 @@ function makeReq(token?: string): Request {
 describe('GET /api/auth/me resilience', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    clearTokenCache();
   });
 
   it('returns 401 when no token is provided', async () => {

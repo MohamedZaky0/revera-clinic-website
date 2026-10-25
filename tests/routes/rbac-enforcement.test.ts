@@ -11,8 +11,8 @@ import { createSupabaseFake } from '../helpers/supabaseFake';
 const fake = createSupabaseFake();
 
 vi.mock('@/lib/supabaseServer', () => ({
-  supabaseServer: { auth: { getUser: (...args: any[]) => fake.authGetUser(...args) }, from: (t: string) => fake.client.from(t) },
-  getSupabaseServer: () => ({ auth: { getUser: (...args: any[]) => fake.authGetUser(...args) }, from: (t: string) => fake.client.from(t) }),
+  supabaseServer: { auth: { getUser: (...args: any[]) => fake.authGetUser(...args), getClaims: (...args: any[]) => fake.authGetClaims(...args) }, from: (t: string) => fake.client.from(t) },
+  getSupabaseServer: () => ({ auth: { getUser: (...args: any[]) => fake.authGetUser(...args), getClaims: (...args: any[]) => fake.authGetClaims(...args) }, from: (t: string) => fake.client.from(t) }),
 }));
 
 import { DELETE as deleteProvider } from '@/app/api/providers/route';

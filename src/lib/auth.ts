@@ -1,4 +1,5 @@
 import { supabaseServer } from './supabaseServer';
+import { verifyAccessToken } from './verifyToken';
 
 export async function verifyHrAccess(req: Request) {
   try {
@@ -9,12 +10,14 @@ export async function verifyHrAccess(req: Request) {
       return { error: 'No authorization token provided', status: 401 };
     }
 
-    // Verify token and fetch auth user
-    const { data: { user }, error: authError } = await supabaseServer.auth.getUser(token);
+    // RISK-134: identity is verified locally (or from a short cache), not by an Auth-server call
+    // per request. The is_active / role lookups below stay on the database, on every request.
+    const verified = await verifyAccessToken(token, supabaseServer);
 
-    if (authError || !user) {
-      return { error: authError?.message || 'Invalid session', status: 401 };
+    if (!verified.ok) {
+      return { error: verified.message || 'Invalid session', status: verified.reason === 'unavailable' ? 503 : 401 };
     }
+    const user = verified.user;
 
     // 1. Superadmin bypass
     // Superadmin access is resolved from the registered employee role below.

@@ -1,4 +1,5 @@
 import { supabaseServer } from "@/lib/supabaseServer";
+import { verifyAccessToken } from "@/lib/verifyToken";
 
 export type StaffAccess = {
   user: { id: string; email?: string | null };
@@ -9,7 +10,7 @@ export type StaffAccess = {
 
 export type AccessResult =
   | { access: StaffAccess }
-  | { error: string; status: 401 | 403 | 500 };
+  | { error: string; status: 401 | 403 | 500 | 503 };
 
 export type AuthenticatedUserResult =
   | { user: { id: string; email?: string | null; phone?: string | null } }
@@ -35,13 +36,20 @@ export async function requireStaffAccess(req: Request): Promise<AccessResult> {
     const token = req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "").trim();
     if (!token) return { error: "Authentication is required.", status: 401 };
 
-    const { data: authData, error: authError } = await supabaseServer.auth.getUser(token);
-    if (authError || !authData.user) return { error: "Invalid or expired session.", status: 401 };
+    // RISK-134: the token proves who the caller is (verified locally, or from a short cache for legacy
+    // HS256 tokens; no Auth-server call per request). Whether that person may still act
+    // (employee_accounts.is_active, role) is read from the database below on EVERY request.
+    const verified = await verifyAccessToken(token, supabaseServer);
+    if (!verified.ok) {
+      if (verified.reason === "unavailable") return { error: verified.message, status: 503 };
+      return { error: "Invalid or expired session.", status: 401 };
+    }
+    const authUser = verified.user;
 
     const employeeLookup = await supabaseServer
       .from("employee_accounts")
       .select("id, employee_id, email, role_name, auth_user_id, is_active")
-      .eq("auth_user_id", authData.user.id)
+      .eq("auth_user_id", authUser.id)
       .maybeSingle();
     let employee = employeeLookup.data;
     const employeeError = employeeLookup.error;
@@ -49,8 +57,8 @@ export async function requireStaffAccess(req: Request): Promise<AccessResult> {
     if (employeeError) throw employeeError;
 
     // Fallback: Check by email if auth_user_id was not linked yet
-    if (!employee && authData.user.email) {
-      const userEmail = authData.user.email.trim().toLowerCase();
+    if (!employee && authUser.email) {
+      const userEmail = authUser.email.trim().toLowerCase();
       const { data: empByEmail, error: empEmailError } = await supabaseServer
         .from("employee_accounts")
         .select("id, employee_id, email, role_name, auth_user_id, is_active")
@@ -64,7 +72,7 @@ export async function requireStaffAccess(req: Request): Promise<AccessResult> {
         if (!empByEmail.auth_user_id) {
           await supabaseServer
             .from("employee_accounts")
-            .update({ auth_user_id: authData.user.id })
+            .update({ auth_user_id: authUser.id })
             .eq("id", empByEmail.id);
         }
       }
@@ -93,7 +101,7 @@ export async function requireStaffAccess(req: Request): Promise<AccessResult> {
 
     return {
       access: {
-        user: authData.user,
+        user: { id: authUser.id, email: authUser.email },
         employee,
         role: normalizedRole,
         permissions: Array.isArray(roleRecord?.permissions) ? roleRecord.permissions : [],

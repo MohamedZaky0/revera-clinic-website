@@ -31,13 +31,36 @@ Server-side helpers (`src/lib/access.ts` unless noted):
 
 | Helper | Proves | Does NOT prove |
 |---|---|---|
-| `requireAuthenticatedUser(req)` | Token is a valid, unexpired Supabase session | Staff, role, or ownership of anything |
-| `requireStaffAccess(req)` | Caller has an **active** `employee_accounts` row (any role); an inactive account is refused (DEC-117) | Which role — caller may still be low-privilege |
+| `requireAuthenticatedUser(req)` | Token is a valid, unexpired Supabase session (still checked with one `auth.getUser` call to the Auth server per request, RISK-134) | Staff, role, or ownership of anything |
+| `requireStaffAccess(req)` | Token verified locally by `verifyAccessToken` (RISK-134), then caller has an **active** `employee_accounts` row (any role); an inactive account is refused (DEC-117) | Which role — caller may still be low-privilege |
 | `requireAdministratorAccess(req)` | Caller's role is `admin` or `superadmin` | Finance-specific permission — see `hasFinancePermission` |
 | `requireSuperadminAccess(req)` | Caller's role is `superadmin` | — |
 | `requireFinanceAccess(req, anyOf)` | `superadmin`, or a staff member holding one of the listed `finance.*` permissions | — |
-| `verifyHrAccess(req)` (`src/lib/auth.ts`) | Active registered staff whose role is `superadmin`, `admin` or `hr` | Finance permission; any other role is refused with 403 |
+| `verifyHrAccess(req)` (`src/lib/auth.ts`) | Token verified locally by `verifyAccessToken` (RISK-134); active registered staff whose role is `superadmin`, `admin` or `hr` | Finance permission; any other role is refused with 403 |
 | `requireReceptionAccess(req)` (private to `api/reception/dashboard`) | Staff whose role is one of the reception / HR roles the dashboard allows (RISK-059) | — |
+
+**How a bearer token is verified (RISK-134, `src/lib/verifyToken.ts`).** `requireStaffAccess`, `verifyHrAccess` and
+`GET /api/auth/me` no longer call the Supabase Auth server on every request. They call `verifyAccessToken(token, supabaseServer)`,
+which uses `auth.getClaims()`:
+
+- **ES256/RS256 token with a `kid`** (the project's current signing key, ECC P-256 on production since about 2026-06): the signature is
+  checked locally against the project's JWKS (`/auth/v1/.well-known/jwks.json`, fetched once and kept about 10 minutes per server process).
+  No Auth-server call per request.
+- **Legacy HS256 token, no `kid`, empty JWKS, or a `kid` the JWKS does not list**: `getClaims` falls back to one `auth.getUser` call.
+  The helper keeps a bounded in-memory cache (500 entries, key = SHA-256 of the token, 60 s or the token's own expiry, whichever is
+  sooner) and shares one call between concurrent requests with the same token, so this costs at most one Auth call per token per minute
+  per server instance. A cache hit never reaches the Auth server.
+- `getClaims` itself checks only the signature and `exp`. The helper additionally requires `iss = <NEXT_PUBLIC_SUPABASE_URL>/auth/v1`,
+  `aud = authenticated`, `role = authenticated`, `is_anonymous` not true and a well-formed `sub`; it maps every exception `getClaims` can
+  throw on a malformed token to "invalid" (401); and it maps an unreachable or failing Auth/JWKS endpoint (network error, 429, 5xx) to
+  "unavailable" (503, RISK-113: the client keeps the session). Unknown key ids are rate-limited (5 distinct per minute, 60 s cooldown).
+- **A token proves who the caller is, not that they may still act.** The `employee_accounts` lookup (`is_active`, role) is a database read on
+  every request and is unchanged, so deactivating a staff member (DEC-117) still takes effect on the very next request. What a locally
+  verified token does not see is a revoked *session* (sign-out elsewhere, a banned auth user): an ES256 access token stays acceptable until
+  its own `exp` (default 1 hour). For staff that is covered by the database check above; `email` in `StaffAccess.user` is the token's
+  snapshot (the email-fallback employee match uses it).
+- `requireAuthenticatedUser` (patient identity in `/api/customers`) deliberately still uses `auth.getUser`: it has no database gate and
+  `isOwnIdentity` compares the live email/phone.
 
 `hasStaffPermission(access, perm)` treats **every** `admin`/`superadmin` as having every staff
 permission — it cannot express "admins may not see X." `hasFinancePermission(access, perm)` is
@@ -68,9 +91,11 @@ const PROTECTED_API_PREFIXES = [
 ];
 ```
 
-For paths under these four prefixes, middleware requires a **valid Supabase bearer token** —
-nothing more. It does **not** check role. A patient's real, valid OTP session token satisfies this
-middleware just as well as a staff token would.
+For paths under these four prefixes, middleware requires a **well-formed, unexpired bearer token** —
+nothing more (RISK-134): a 3-part JWT whose `exp` has not passed. It makes **no network call** and does **not**
+verify the signature (before RISK-134 it called `/auth/v1/user` on every request, which doubled the Auth-server
+load); the signature, issuer, audience and the employee row are checked by the route handler (below). It does
+**not** check role. A patient's real, valid OTP session token passes this middleware just as a staff token would.
 
 - Every one of these also has route-level checks, so middleware is a second layer, not the only one:
   `/api/employees` and `/api/roles` use `requireAdministratorAccess` (`PATCH /api/roles` is

@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { createStallGuardFetch } from '@/lib/stallGuardFetch';
 
 // Protected administrative API path prefixes that require authentication
 const PROTECTED_API_PREFIXES = [
@@ -16,12 +15,21 @@ const PROTECTED_API_PREFIXES = [
 // and break the sales history display. The POST (creating a sale) is instead protected at
 // the handler level in that route file. See RISK-018 / FINANCE_TRACKER 0.10.
 
-// RISK-131: this check calls Supabase for every protected request; a stalled call used to hold the
-// request until the platform killed it after 25 s. A read that has not answered is cut and repeated.
-const stallGuardedFetch = createStallGuardFetch({
-  onRetry: ({ url, attempt, stalled }) =>
-    console.warn(`[supabase-stall] middleware: ${stalled ? 'no answer' : 'connection dropped'} from ${url}, attempt ${attempt} cut, asking again`),
-});
+// RISK-134: no network call here any more. The middleware only rejects what is plainly unusable (no token,
+// not a 3-part JWT, past its exp); the route handler of every protected prefix verifies the token properly
+// (src/lib/verifyToken.ts) and then checks the employee row, so a second verification here only doubled the
+// Auth-server load. jose is not imported: it is not a direct dependency.
+function decodeExp(token: string): number | null | 'malformed' {
+  const parts = token.split('.');
+  if (parts.length !== 3 || parts.some((p) => !/^[A-Za-z0-9_-]+$/.test(p))) return 'malformed';
+  try {
+    const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const payload = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4)), (c) => c.charCodeAt(0))));
+    return typeof payload?.exp === 'number' ? payload.exp : null;
+  } catch {
+    return 'malformed';
+  }
+}
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -30,8 +38,6 @@ export async function middleware(request: NextRequest) {
   if (isProtectedApi) {
     const authHeader = request.headers.get('authorization') || '';
     const token = authHeader.replace(/^Bearer\s+/i, '').trim();
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
     if (!token) {
       return NextResponse.json(
@@ -39,29 +45,9 @@ export async function middleware(request: NextRequest) {
         { status: 401 }
       );
     }
-    if (!supabaseUrl || !supabaseAnonKey) {
-      return NextResponse.json({ error: 'Authentication service is not configured.' }, { status: 500 });
-    }
 
-    let authResponse: Response;
-    try {
-      authResponse = await stallGuardedFetch(`${supabaseUrl}/auth/v1/user`, {
-        headers: {
-          apikey: supabaseAnonKey,
-          authorization: `Bearer ${token}`,
-        },
-      });
-    } catch {
-      // Supabase unreachable: the session was not judged invalid, so this is not a 401.
-      return NextResponse.json({ error: 'Could not verify the session right now. Please try again.' }, { status: 503 });
-    }
-
-    // Only an answer that says the token is bad is a 401. A rate limit or an upstream failure says
-    // nothing about the login, and a 401 here reads to the client as "your session is over".
-    if (authResponse.status === 429 || authResponse.status >= 500) {
-      return NextResponse.json({ error: 'Could not verify the session right now. Please try again.' }, { status: 503 });
-    }
-    if (!authResponse.ok) {
+    const exp = decodeExp(token);
+    if (exp === 'malformed' || exp === null || exp * 1000 <= Date.now()) {
       return NextResponse.json({ error: 'Unauthorized: Invalid or expired session.' }, { status: 401 });
     }
   }

@@ -243,19 +243,9 @@ export async function POST(req: Request) {
     service_commissions: normalizeServiceCommissions(serviceCommissions),
   };
 
-  const authHeader = req.headers.get('Authorization') || '';
-  const token = authHeader.replace('Bearer ', '').trim();
-  let changedBy = 'System/Unknown';
-  if (token) {
-    try {
-      const { data: { user } } = await supabaseServer.auth.getUser(token);
-      if (user?.email) {
-        changedBy = user.email;
-      }
-    } catch (e) {
-      console.warn("Could not get user from auth token in providers API:", e);
-    }
-  }
+  // RISK-134: the audit trail takes the caller's email from the access check above; it used to ask
+  // the Auth server a second time (getUser) for the same token on every write.
+  const changedBy = access.access.user.email || 'System/Unknown';
 
   try {
     const { data, error } = await supabaseServer
@@ -428,19 +418,9 @@ export async function PATCH(req: Request) {
   if (commissionFixedComponent !== undefined) updates.commission_fixed_component = Number(commissionFixedComponent || 0);
   if (serviceCommissions !== undefined) updates.service_commissions = normalizeServiceCommissions(serviceCommissions);
 
-  const authHeader = req.headers.get('Authorization') || '';
-  const token = authHeader.replace('Bearer ', '').trim();
-  let changedBy = 'System/Unknown';
-  if (token) {
-    try {
-      const { data: { user } } = await supabaseServer.auth.getUser(token);
-      if (user?.email) {
-        changedBy = user.email;
-      }
-    } catch (e) {
-      console.warn("Could not get user from auth token in providers API:", e);
-    }
-  }
+  // RISK-134: the audit trail takes the caller's email from the access check above; it used to ask
+  // the Auth server a second time (getUser) for the same token on every write.
+  const changedBy = access.access.user.email || 'System/Unknown';
 
   try {
     // `id` is mandatory (400 above) and providers has no unique constraint on `name`, so an

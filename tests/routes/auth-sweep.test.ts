@@ -48,7 +48,7 @@ const fake = createSupabaseFake();
 
 vi.mock('@/lib/supabaseServer', () => {
   const server = {
-    auth: { getUser: (...args: any[]) => fake.authGetUser(...args) },
+    auth: { getUser: (...args: any[]) => fake.authGetUser(...args), getClaims: (...args: any[]) => fake.authGetClaims(...args) },
     from: (table: string) => fake.client.from(table),
     rpc: (name: string, args?: any) => fake.client.rpc(name, args),
   };

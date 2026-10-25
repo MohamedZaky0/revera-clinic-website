@@ -25,7 +25,10 @@
  *   const fake = createSupabaseFake();
  *   vi.mock('@/lib/supabaseServer', () => ({
  *     supabaseServer: {
- *       auth: { getUser: (...args: any[]) => fake.authGetUser(...args) },
+ *       auth: {
+ *         getUser: (...args: any[]) => fake.authGetUser(...args),
+ *         getClaims: (...args: any[]) => fake.authGetClaims(...args),   // RISK-134: routes verify with getClaims
+ *       },
  *       from: (table: string) => fake.client.from(table),
  *     },
  *   }));
@@ -44,8 +47,40 @@
  */
 
 import { vi, type Mock } from 'vitest';
+import { clearTokenCache } from '@/lib/verifyToken';
 
 export type FakeRow = Record<string, any>;
+
+/**
+ * RISK-134: server code now verifies bearer tokens with `auth.getClaims(token)` (src/lib/verifyToken.ts)
+ * instead of `auth.getUser(token)`. Tests keep controlling the identity through their `getUser`
+ * mock (`fake.authGetUser` or a local `vi.fn()`); this adapts that mock into a `getClaims` answer
+ * with the same outcome: the user becomes valid claims (aud 'authenticated', exp in the future),
+ * and an error is passed through untouched, so retryable/plain-error semantics are preserved.
+ */
+export function claimsFromGetUser(getUser: (...args: any[]) => any) {
+  return async (token: string) => {
+    const { data, error } = (await getUser(token)) ?? {};
+    if (error || !data?.user) return { data: null, error: error ?? { message: 'Invalid JWT' } };
+    const u = data.user;
+    return {
+      data: {
+        claims: {
+          sub: u.id,
+          email: u.email,
+          phone: u.phone,
+          iss: `${(process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').replace(/\/+$/, '')}/auth/v1`,
+          aud: 'authenticated',
+          role: 'authenticated',
+          exp: Math.floor(Date.now() / 1000) + 3600,
+        },
+        header: {},
+        signature: new Uint8Array(),
+      },
+      error: null,
+    };
+  };
+}
 
 interface Filter {
   op: string;
@@ -123,6 +158,8 @@ export interface SupabaseFake {
   client: any;
   /** `vi.fn()` backing `client.auth.getUser` — set its resolved value per test. */
   authGetUser: Mock<(...args: any[]) => any>;
+  /** Backs `client.auth.getClaims`: answers from whatever `authGetUser` is set to (see claimsFromGetUser). */
+  authGetClaims: (token: string) => Promise<any>;
   /** Replace a table's contents. */
   seed(table: string, rows: FakeRow[]): void;
   /** Empty every table, reset the auth mock, and clear registered RPC handlers. */
@@ -142,6 +179,7 @@ export function createSupabaseFake(): SupabaseFake {
   let idCounter = 1;
   let invoiceSeq = 1;
   const authGetUser = vi.fn();
+  const authGetClaims = claimsFromGetUser((...args: any[]) => authGetUser(...args));
   const rpcHandlers = new Map<string, (args: any) => any>();
   rpcHandlers.set('next_invoice_no', () => ({ data: invoiceSeq++, error: null }));
 
@@ -277,7 +315,10 @@ export function createSupabaseFake(): SupabaseFake {
   }
 
   const client = {
-    auth: { getUser: (...args: any[]) => authGetUser(...args) },
+    auth: {
+      getUser: (...args: any[]) => authGetUser(...args),
+      getClaims: (token: string) => authGetClaims(token),
+    },
     from: (name: string) => createQueryBuilder(name),
     async rpc(name: string, args?: any) {
       const handler = rpcHandlers.get(name);
@@ -295,6 +336,7 @@ export function createSupabaseFake(): SupabaseFake {
     db,
     client,
     authGetUser,
+    authGetClaims,
     seed(name: string, rows: FakeRow[]) {
       db[name] = rows.map((r) => ({ ...r }));
     },
@@ -303,6 +345,8 @@ export function createSupabaseFake(): SupabaseFake {
       idCounter = 1;
       invoiceSeq = 1;
       authGetUser.mockReset();
+      // The token cache would otherwise carry one test's verified user into the next test.
+      clearTokenCache();
       rpcHandlers.clear();
       rpcHandlers.set('next_invoice_no', () => ({ data: invoiceSeq++, error: null }));
     },

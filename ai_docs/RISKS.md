@@ -1267,6 +1267,7 @@ filled in with the above.
 - [RISK-128](#risk-128) — The Public Browser Key Could Read Staff Accounts, Salaries, Attendance, Prescriptions And More — And Write Or Delete Accounts And Roles (RESOLVED ON DEV AND PRODUCTION; PRODUCTION SCREENS NOT YET RE-CHECKED BY THE OWNER)
 - [RISK-129](#risk-129) — Patients Who Paid Showed "Total Spend 0" (RESOLVED, NOT YET CONFIRMED ON PRODUCTION)
 - [RISK-133](#risk-133) — "Hard Delete" Of A Patient Looked Like It Did Nothing: The Patient Came Back From Its Bookings (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
+- [RISK-134](#risk-134) — Every Staff Request Asked The Supabase Auth Server To Check The Login, About 68,000 Auth Requests An Hour, Which Helped Keep The Production Database Unhealthy (RESOLVED ON DEV, NOT YET CONFIRMED ON PRODUCTION)
 
 ## RISK-003: Patient Auth Is Non-Functional
 
@@ -5666,3 +5667,41 @@ See `PROPOSALS.md` for:
 **To clear the existing "Hamada Test" entry on production:** nothing in this change deletes data. Delete (or cancel) its one booking from the Bookings screen as superadmin and the entry disappears. That booking has 1 transaction linked to it (the transaction stays, with no booking), which is for the owner to accept.
 
 **Open (owner decision):** whether a permanent delete should be able to remove a patient together with their bookings and payments (for test data). Not built: it would erase income and visit history with no way back. Options: (a) keep as is, test data is cleaned by deleting its bookings first; (b) a separate superadmin-only "delete test patient and everything" action that lists what will be erased and asks to type the patient's name.
+
+## RISK-134: Every Staff Request Asked The Supabase Auth Server To Check The Login, About 68,000 Auth Requests An Hour, Which Helped Keep The Production Database Unhealthy (RESOLVED ON DEV, NOT YET CONFIRMED ON PRODUCTION)
+
+**Date:** 2026-10-25 · **Related:** RISK-131 / DEC-126 (stall guard), RISK-113 (503 on a transient check failure), RISK-117 (middleware), DEC-117 (inactive accounts), DEC-129
+
+**What was seen:** the production Supabase project (Nano compute) went "Unhealthy" for Auth and the REST API, with about 68,878 Auth requests and 2,799 Auth errors in an hour and about 204,000 REST requests. When Auth is slow, staff see "Could not verify your session right now" or a 401/503 on every screen.
+
+**Why:** every staff API call asked the Auth server "who is this token?" with `auth.getUser(token)` (`requireStaffAccess`, `verifyHrAccess`, `GET /api/auth/me`), and the four protected prefixes asked a second time in `src/middleware.ts` (a hand-written `fetch` to `/auth/v1/user`); the provider create/edit routes asked a third time only to read the caller's e-mail for the audit trail. One admin page load fires many API calls, so one person produced dozens of Auth calls. The stall guard (RISK-131) repeats a slow read up to 3 more times, which multiplies that load when Auth is already struggling.
+
+**Fix (DEC-129):** one shared helper, `src/lib/verifyToken.ts` (`verifyAccessToken`), built on `auth.getClaims()`:
+- ES256 token (what production issues now): verified on the server with the public key (JWKS). **Auth-server calls per request: 0** (one JWKS read per server process per about 10 minutes).
+- HS256 token (only possible from the old, expired signing key, or on a project that never moved to signing keys): `getClaims` still needs one `getUser` call. The helper caches a successful check for 60 s (or until the token expires), bounded to 500 entries, keyed by a hash of the token, and shares one call between simultaneous requests. **At most 1 Auth call per token per minute per server instance.** On a project whose only key is the legacy HS256 secret this change gives no reduction except through that cache.
+- It adds the checks `getClaims` does not make (issuer = this project, audience and role `authenticated`, not an anonymous user, a well-formed `sub`), turns every exception `getClaims` throws on a malformed token into a 401, and rate-limits never-seen key ids (5 per minute, 60 s cooldown) so a flood of made-up tokens cannot become a flood of JWKS/Auth calls. It adds no retry of its own: the client already carries the stall guard, and a second retry layer would multiply calls.
+- Auth or JWKS unreachable, 429 or 5xx -> `unavailable` -> **503** (RISK-113, the session is kept). This now also applies in `requireStaffAccess` and `verifyHrAccess`, which used to answer 401 for it. A short (3 s) memory of "unavailable" stops a burst from each retrying a struggling server.
+- `src/middleware.ts` no longer calls Supabase at all: it refuses a missing, malformed or expired token and leaves the real verification to the handler, which every handler under the four protected prefixes already runs (checked: all 10 route files, every exported method has a guard).
+- `src/app/api/providers/route.ts` POST/PATCH read the caller's e-mail from the access check already done instead of a second `getUser`.
+
+**Not changed on purpose:**
+- The database lookup of the employee row (`is_active`, role) still runs on every request. A valid signature is never treated as permission: an inactive staff member is refused on the very next request (DEC-117), proved by `tests/routes/local-jwt-verification.test.ts` with a token that has a real valid ES256 signature, including when that token's verification is cached.
+- `requireAuthenticatedUser` (patient identity, `/api/customers`) still uses `auth.getUser`: it has no database gate, and it compares the live e-mail/phone. That is one Auth call per such request.
+- Production signing keys: the owner confirmed on 2026-10-25 (dashboard, JWT Signing Keys) that the current key is ECC (P-256), created about 4 months ago, and that the previous key is HS256, still listed under "Previously used keys". Do not revoke the old HS256 key: the legacy `anon` and `service_role` API keys are HS256 JWTs and revoking could break the app.
+
+**Trade-off to know:** a locally verified token cannot see that its session was ended (signed out elsewhere, auth user banned) until the token expires (default 1 hour). For staff the employee row check covers deactivation immediately; for anything not backed by an `employee_accounts` row there is no such backstop. `StaffAccess.user.email` is the token's e-mail at issue time.
+
+**Auth-server calls per request after the change:**
+
+| Path | Before | After |
+|---|---|---|
+| Staff API under the 4 protected prefixes | 2 (middleware + handler) | 0 with an ES256 token; at most 1 per token per minute per instance with an HS256 token |
+| Other staff API (`requireStaffAccess`) | 1 | 0 / at most 1 per token per minute |
+| `GET /api/auth/me` | 1 | 0 / at most 1 per token per minute |
+| Provider create / edit | 2 | 0 / at most 1 per token per minute |
+| Patient identity (`requireAuthenticatedUser`, `/api/customers`) | 1 | 1 (unchanged) |
+| Browser-side Supabase calls (login, token refresh) | unchanged | unchanged |
+
+**Not verified:** the effect on production Auth request counts (needs a deploy and a day of Supabase "Auth" metrics); that `next build` bundles `src/middleware.ts` unchanged on Vercel (the middleware no longer imports Supabase, so this is low risk, but no production build was run in this change); the owner's own admin session on the deployed site.
+
+**Tests:** `tests/lib/verifyToken.test.ts` (real supabase-js `getClaims` with a generated ES256 key and a stubbed network), `tests/routes/local-jwt-verification.test.ts`, `tests/routes/middleware-auth.test.ts`. Manual checklist: `ai_docs/manual_tests/LOCAL_JWT_VERIFICATION_MANUAL_TESTS.md`.

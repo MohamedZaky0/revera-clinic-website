@@ -3970,3 +3970,20 @@ A patient that exists only in the list because of bookings (`res-cust-<phone>`, 
 **Not changed on purpose (business decision, see RISK-133):** the rule is the safe one. A permanent delete that also removes the patient's bookings and payments (what the old dialog text implied) would erase income and visit records, so it was not built. Soft Delete (Deactivate) remains the way to hide a patient who has history. No migration: the foreign keys are left as they are.
 
 **Tests:** `tests/routes/customers-hard-delete.test.ts` (15 cases, 11 of which failed before the change). Manual checklist: `ai_docs/manual_tests/PATIENT_HARD_DELETE_MANUAL_TESTS.md`.
+
+## DEC-129: Staff Tokens Are Verified On The Server With The Project's Public Key (Not By Asking The Auth Server Each Time); Middleware Only Rejects Unusable Tokens
+
+**Date:** 2026-10-25 · **Status:** Done on dev (branch `fix/local-jwt-verify`); not yet on production · **Related:** RISK-134, DEC-126, DEC-117, RISK-113
+
+**Decision:**
+1. `requireStaffAccess`, `verifyHrAccess` and `GET /api/auth/me` verify the bearer token through one helper, `verifyAccessToken` (`src/lib/verifyToken.ts`), built on `auth.getClaims()`. ES256 tokens are checked locally against the JWKS; HS256 tokens fall back to one `getUser` call that the helper caches (60 s, 500 entries, hash key) and de-duplicates. The helper adds the issuer / audience / role / anonymous / subject checks `getClaims` omits and maps every failure to 401 (bad token) or 503 (Supabase unreachable or failing).
+2. The employee row (`is_active`, role, permissions) is still read from the database on every request. A valid token is proof of identity only.
+3. `src/middleware.ts` makes no network call: it refuses a missing, malformed or expired token and leaves verification to the handler (every handler under its four prefixes has a guard). `jose` is not used (not a direct dependency).
+4. `requireAuthenticatedUser` (patients) keeps `auth.getUser`.
+5. Provider create/edit take the audit e-mail from the access check, not a second `getUser`.
+
+**Why:** RISK-134. The per-request Auth call was the main driver of about 68,000 Auth requests an hour on the Nano instance; the stall guard's repeats made it worse. Production already signs with an ES256 key, so the check can be local.
+
+**Rejected:** verifying in middleware as well with `jose` (a second implementation, a new direct dependency, no extra security because the handler re-checks); caching the employee row (would delay DEC-117 deactivation); revoking the old HS256 signing key (the legacy `anon` / `service_role` API keys are HS256 JWTs).
+
+**Tests:** `tests/lib/verifyToken.test.ts`, `tests/routes/local-jwt-verification.test.ts`, `tests/routes/middleware-auth.test.ts`. Manual checklist: `ai_docs/manual_tests/LOCAL_JWT_VERIFICATION_MANUAL_TESTS.md`.

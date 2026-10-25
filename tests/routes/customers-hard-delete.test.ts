@@ -21,7 +21,7 @@ const listUsers = vi.fn();
 vi.mock('@/lib/supabaseServer', () => ({
   supabaseServer: {
     auth: {
-      getUser: (...args: any[]) => fake.authGetUser(...args),
+      getUser: (...args: any[]) => fake.authGetUser(...args), getClaims: (...args: any[]) => fake.authGetClaims(...args),
       admin: {
         listUsers: (...args: any[]) => listUsers(...args),
         deleteUser: (...args: any[]) => deleteUser(...args),
