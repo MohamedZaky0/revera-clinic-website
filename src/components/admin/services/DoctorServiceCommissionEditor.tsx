@@ -1,10 +1,17 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 
 export interface ServiceOption {
   id: number;
+  en: string;
+  ar?: string;
+  cat?: string;
+}
+
+export interface ServiceCategoryOption {
+  key: string;
   en: string;
   ar?: string;
 }
@@ -22,6 +29,7 @@ export type DefaultCommissionType = 'none' | 'fixed' | 'percentage' | 'both';
 
 interface DoctorServiceCommissionEditorProps {
   allServices: ServiceOption[];
+  categories?: ServiceCategoryOption[];
   services: string[];
   commissions: ServiceCommissionEntry[];
   defaultType: DefaultCommissionType;
@@ -39,6 +47,7 @@ interface DoctorServiceCommissionEditorProps {
 
 export function DoctorServiceCommissionEditor({
   allServices,
+  categories = [],
   services,
   commissions,
   defaultType,
@@ -57,6 +66,46 @@ export function DoctorServiceCommissionEditor({
     const selectedSet = new Set(services);
     return allServices.filter((s) => !selectedSet.has(s.en)).sort((a, b) => a.en.localeCompare(b.en));
   }, [allServices, services]);
+
+  // Category picker (additive, alongside the "+ Add Service" dropdown above): lets the admin
+  // narrow the service checklist to one or more categories at once. Checkboxes rather than a
+  // <select> on purpose — a native select closes after every pick, so checking several
+  // categories one at a time meant reopening it each time.
+  const [categoryFilters, setCategoryFilters] = useState<string[]>([]);
+
+  const categoryLookup = useMemo(() => {
+    const map = new Map<string, string>();
+    categories.forEach((c) => map.set(c.key, c.en || c.key));
+    return map;
+  }, [categories]);
+
+  const categoryList = useMemo(() => {
+    const seen = new Map<string, string>();
+    allServices.forEach((s) => {
+      const key = s.cat || '';
+      if (!key || seen.has(key)) return;
+      seen.set(key, categoryLookup.get(key) || key);
+    });
+    return Array.from(seen.entries())
+      .map(([key, label]) => ({ key, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [allServices, categoryLookup]);
+
+  const toggleCategoryFilter = (key: string) => {
+    setCategoryFilters((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+  };
+
+  const servicesInView = useMemo(() => {
+    const byCategory = categoryFilters.length === 0
+      ? allServices
+      : allServices.filter((s) => categoryFilters.includes(s.cat || ''));
+    return [...byCategory].sort((a, b) => a.en.localeCompare(b.en));
+  }, [allServices, categoryFilters]);
+
+  const toggleServiceChecked = (svc: ServiceOption, checked: boolean) => {
+    if (checked) handleAddService(svc.en);
+    else handleRemoveService(svc.en);
+  };
 
   const getCommission = (serviceName: string): ServiceCommissionEntry | undefined => {
     return commissions.find((c) => c.service === serviceName);
@@ -244,7 +293,7 @@ export function DoctorServiceCommissionEditor({
           })}
         </div>
 
-        {/* Add service */}
+        {/* Add service — quick single pick */}
         <div className="flex items-center gap-2 pt-1">
           <select
             value=""
@@ -261,6 +310,107 @@ export function DoctorServiceCommissionEditor({
               </option>
             ))}
           </select>
+        </div>
+
+        {/* Add service, by category — on top of the quick picker above, not instead of it */}
+        <div className="rounded-xl border border-[var(--cr-primary)]/10 bg-[var(--color-brand-light)] p-3 space-y-2.5 pt-2">
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <label className={`${labelClass} mb-0`}>Browse by Category</label>
+              {categoryFilters.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setCategoryFilters([])}
+                  className="text-[11px] font-semibold text-[var(--color-brand-secondary)] hover:underline"
+                >
+                  Clear filter
+                </button>
+              )}
+            </div>
+            {/* Checkboxes, not a <select> — a dropdown closes after every pick, which made
+                checking several categories in a row annoying (reopen, pick, reopen, pick...). */}
+            <div className="flex flex-wrap gap-x-3 gap-y-1.5">
+              {categoryList.map((c) => {
+                const checked = categoryFilters.includes(c.key);
+                return (
+                  <label
+                    key={c.key}
+                    className="flex items-center gap-1.5 text-xs font-medium text-[var(--cr-dark)] cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleCategoryFilter(c.key)}
+                      className="h-3.5 w-3.5 rounded border-[var(--cr-primary)]/20 text-[var(--cr-primary)] focus:ring-[var(--cr-accent)]"
+                    />
+                    {c.label}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          {servicesInView.length === 0 ? (
+            <p className="text-xs text-[var(--color-brand-secondary)]">No services in this category.</p>
+          ) : (
+            <>
+              <div className="flex items-center gap-3 text-[11px] font-semibold text-[var(--cr-primary)]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const toAdd = servicesInView.filter((s) => !services.includes(s.en));
+                    if (toAdd.length === 0) return;
+                    onServicesChange([...services, ...toAdd.map((s) => s.en)]);
+                    const initialType: PerServiceCommissionType =
+                      defaultType === 'both' ? 'fixed' : (defaultType as PerServiceCommissionType);
+                    onCommissionsChange([
+                      ...commissions,
+                      ...toAdd.map((s) => ({
+                        service: s.en,
+                        serviceId: s.id,
+                        type: initialType,
+                        value: Number(defaultValue || 0),
+                      })),
+                    ]);
+                  }}
+                  className="hover:underline"
+                >
+                  Select all in view
+                </button>
+                <span className="text-gray-300">|</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const inView = new Set(servicesInView.map((s) => s.en));
+                    onServicesChange(services.filter((s) => !inView.has(s)));
+                    onCommissionsChange(commissions.filter((c) => !inView.has(c.service)));
+                  }}
+                  className="hover:underline"
+                >
+                  Clear all in view
+                </button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-56 overflow-y-auto pr-1">
+                {servicesInView.map((svc) => {
+                  const checked = services.includes(svc.en);
+                  return (
+                    <label
+                      key={svc.id}
+                      className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-[var(--cr-dark)] hover:bg-white cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => toggleServiceChecked(svc, e.target.checked)}
+                        className="h-4 w-4 rounded border-[var(--cr-primary)]/20 text-[var(--cr-primary)] focus:ring-[var(--cr-accent)]"
+                      />
+                      <span className="truncate">{svc.en}{svc.ar ? ` - ${svc.ar}` : ''}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

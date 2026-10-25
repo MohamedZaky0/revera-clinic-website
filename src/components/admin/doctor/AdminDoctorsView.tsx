@@ -25,7 +25,8 @@ interface AdminDoctorsViewProps {
   branches: Branch[];
   allReservations: any[];
   localServices: any[];
-  allServicesList: { id: number; en: string; ar?: string }[];
+  allServicesList: { id: number; en: string; ar?: string; cat?: string }[];
+  serviceCategories?: { key: string; en: string; ar?: string }[];
   getDoctorFirstReservationDate: (docName: string, resList: any[]) => string | null;
   parseEgyptianNationalId: (id: string) => {
     isValid: boolean;
@@ -56,6 +57,7 @@ export default function AdminDoctorsView({
   allReservations,
   localServices,
   allServicesList,
+  serviceCategories,
   getDoctorFirstReservationDate,
   parseEgyptianNationalId,
   uniqueSpecialties,
@@ -128,6 +130,7 @@ export default function AdminDoctorsView({
             providerForm={providerForm}
             branches={branches}
             allServicesList={allServicesList}
+            serviceCategories={serviceCategories}
             getDoctorFirstReservationDate={getDoctorFirstReservationDate}
             allReservations={allReservations}
             parseEgyptianNationalId={parseEgyptianNationalId}

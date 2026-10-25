@@ -33,7 +33,8 @@ import { getDoctorStatusBadgeClass, getDoctorStatusDotClass } from "@/components
 interface ProviderFormFieldsProps {
   providerForm: UseProviderFormReturn;
   branches: Branch[];
-  allServicesList: { id: number; en: string; ar?: string }[];
+  allServicesList: { id: number; en: string; ar?: string; cat?: string }[];
+  serviceCategories?: { key: string; en: string; ar?: string }[];
   getDoctorFirstReservationDate: (docName: string, resList: any[]) => string | null;
   allReservations: any[];
   parseEgyptianNationalId: (id: string) => {
@@ -55,6 +56,7 @@ export default function ProviderFormFields({
   providerForm,
   branches,
   allServicesList,
+  serviceCategories,
   getDoctorFirstReservationDate,
   allReservations,
   parseEgyptianNationalId,
@@ -617,6 +619,7 @@ export default function ProviderFormFields({
         <div className="pt-2 border-t border-[var(--cr-primary)]/8">
           <DoctorServiceCommissionEditor
             allServices={allServicesList}
+            categories={serviceCategories}
             services={providerFormSelectedServices}
             commissions={providerFormServiceCommissions}
             defaultType={providerFormCommissionType as DefaultCommissionType}

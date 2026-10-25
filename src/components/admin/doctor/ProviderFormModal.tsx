@@ -9,7 +9,8 @@ import { adminTranslations } from "@/components/admin/translations";
 interface ProviderFormModalProps {
   providerForm: UseProviderFormReturn;
   branches: Branch[];
-  allServicesList: { id: number; en: string; ar?: string }[];
+  allServicesList: { id: number; en: string; ar?: string; cat?: string }[];
+  serviceCategories?: { key: string; en: string; ar?: string }[];
   getDoctorFirstReservationDate: (docName: string, resList: any[]) => string | null;
   allReservations: any[];
   parseEgyptianNationalId: (id: string) => {
@@ -30,6 +31,7 @@ export default function ProviderFormModal({
   providerForm,
   branches,
   allServicesList,
+  serviceCategories,
   getDoctorFirstReservationDate,
   allReservations,
   parseEgyptianNationalId,
@@ -75,6 +77,7 @@ export default function ProviderFormModal({
             providerForm={providerForm}
             branches={branches}
             allServicesList={allServicesList}
+            serviceCategories={serviceCategories}
             getDoctorFirstReservationDate={getDoctorFirstReservationDate}
             allReservations={allReservations}
             parseEgyptianNationalId={parseEgyptianNationalId}

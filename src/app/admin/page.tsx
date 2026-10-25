@@ -2723,15 +2723,21 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   }, [serviceSearch, localServices]);
 
   const allServicesList = useMemo(() => {
-    const map = new Map<string, { id: number; en: string; ar?: string }>();
+    const map = new Map<string, { id: number; en: string; ar?: string; cat?: string }>();
     SERVICES.forEach(s => {
-      map.set(s.en, { id: s.id, en: s.en, ar: s.ar });
+      map.set(s.en, { id: s.id, en: s.en, ar: s.ar, cat: s.cat });
     });
     localServices.forEach(s => {
-      map.set(s.en, { id: s.id, en: s.en, ar: s.ar });
+      map.set(s.en, { id: s.id, en: s.en, ar: s.ar, cat: s.cat });
     });
     return Array.from(map.values()).sort((a, b) => a.en.localeCompare(b.en));
   }, [localServices]);
+
+  // Category list for the doctor/employee "Services & Commissions" picker (browse-by-category).
+  const serviceCategoriesForPicker = useMemo(
+    () => localCategories.map((c) => ({ key: c.key, en: c.en, ar: c.ar })),
+    [localCategories]
+  );
 
   const totalServicePages = Math.ceil(filteredServices.length / SERVICE_PAGE_SIZE);
   const pagedServices = filteredServices.slice((servicePage - 1) * SERVICE_PAGE_SIZE, servicePage * SERVICE_PAGE_SIZE);
@@ -6740,6 +6746,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               allReservations={allReservations}
               localServices={localServices}
               allServicesList={allServicesList}
+              serviceCategories={serviceCategoriesForPicker}
               getDoctorFirstReservationDate={getDoctorFirstReservationDate}
               parseEgyptianNationalId={parseEgyptianNationalId}
               uniqueSpecialties={uniqueSpecialties}
@@ -7973,6 +7980,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               handleAvatarUpload={handleAvatarUpload}
               handleAvatarRemove={handleAvatarRemove}
               allServicesList={allServicesList}
+              serviceCategories={serviceCategoriesForPicker}
               session={session}
               adminDbId={adminDbId}
               adminEmail={adminEmail}
@@ -9245,6 +9253,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
         providerForm={providerForm}
         branches={branches}
         allServicesList={allServicesList}
+        serviceCategories={serviceCategoriesForPicker}
         getDoctorFirstReservationDate={getDoctorFirstReservationDate}
         allReservations={allReservations}
         parseEgyptianNationalId={parseEgyptianNationalId}
