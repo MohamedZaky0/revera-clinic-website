@@ -482,6 +482,175 @@ vs. still open; update `PROPOSALS.md` PROPOSAL-001's status line from `PROPOSED`
 
 ---
 
+### Brief 36 — Admin refresh: stop tables reloading on every shell render (completed 2026-10-19)
+
+Landed on `feat/brief-36-admin-refresh` in four parts, fast-forwarded into `dev` and merged to `main`
+as `5b03a14` (code and tests only; `ai_docs/` stays on `dev`). Recorded as **RISK-119**.
+- **Part A** (`97d881b`): `authenticatedJsonHeaders` in `page.tsx` is `useMemo` on the access token (it was
+  a new object every shell render, so the Devices tab refetched and flashed its "Loading" row on every
+  poll); the Devices, Products-sales and device-audit-log fetchers only show a spinner when nothing is on
+  screen and keep their rows on failure.
+- **Part B** (`84ec0fb`): `pollDataEqual` (`src/lib/pollEqual.ts`) so the shell's 15 s / 30 s polls keep the
+  previous state when the data is unchanged.
+- **Part B2** (`36185a0`, added mid-brief after review found two 3 s pollers the brief had missed):
+  `AdminBookingsView` compares 36 `reservations` columns via `pollRowsEqualByKeys` (a JSON compare measured
+  8 ms per 5,000 rows and 30 ms per 20,000, over the 20 ms budget); `DoctorAccountView` uses `pollDataEqual`.
+  The key list must be kept in step with the table's mutable columns.
+- **Part C** (`1bb53a6`): `React.memo` on `BookingDetailsModal` and `AdminBookingsView` with their handlers
+  stabilized. Chosen by judgment, not by a Profiler recording.
+
+**Verified live 2026-10-19** on the test database, against `dev` @ `9cb86ba` as the "before": Devices idle 70 s
+went from 15 refetches / 6 spinner flashes / 14 shell re-renders to 0 / 0 / 0; Bookings idle went from 36
+`AdminBookingsView` and 8 shell re-renders to 0 / 0. Real changes still reach the screen (new and rejected
+bookings, UI Approve, Create Device, Update Pulses, Reset Counter, Edit Device, none with a spinner flash),
+and with the server unreachable for 45 s the Pending list kept its rows. Evidence:
+`ai_docs/manual_tests/RISK_119_POLL_RENDER_MANUAL_TESTS.md`.
+
+**Not verified:** the Doctor portal's 3 s poll (needs a login whose role or department is doctor: a superadmin
+is let through any portal URL but is shown the admin panel, because `page.tsx` picks `DoctorAccountView` from
+the account's own role/department, not from the URL), and any Profiler recording (component names are minified, so re-renders were counted by
+hook count and source size instead).
+
+**Left as decisions for Mohamed, not changed:** the 3 s Bookings poll looks redundant now that realtime covers
+`reservations`; Bookings downloads the whole `reservations` table every 3 s per open tab; the
+`fetchScheduleReservations()` call after the `return` in `fetchAllReservations` never runs, so the Schedule
+view does not refresh after writes; `AdminEmployeesView` and `CustomerProfileDrawer` are not memoized (needs
+prop plumbing). Test leftover: device `ZZ_B36_TEST_DEVICE_EDITED` in the test database (the app cannot delete
+devices).
+
+### Brief 36 body (original ask, for reference)
+
+**Landed and archived 2026-10-19; this is the original ask.** Read first: `ai_docs/RISKS.md` RISK-118 and RISK-053 (the comment in
+`src/app/admin/page.tsx` above the booking-poll effect), and `ai_docs/ARCHITECTURE.md` (shell is a
+composer; do not add section logic to it).
+
+**The complaint (Mohamed, 2026-10-19).** Tables "take time to refresh" and the reload is visible
+inside the page. In Inventory → Devices the table keeps flashing its "Loading…" row. RISK-118
+(commit `e20f994`, on `main`) fixed the reload-on-tab-switch side and the shell's own fetchers. The
+children below were left untouched and are the next cause.
+
+### Findings — verified by reading code on 2026-10-19; re-verify line numbers before editing
+
+1. **Root cause of the Devices table flashing.** `src/app/admin/page.tsx:602` defines
+   `const authenticatedJsonHeaders = { … }` as a plain object literal, so it is a **new object on
+   every render of the shell**. It is passed to children as `authHeaders` (48 uses in `page.tsx`;
+   `AdminInventoryView` receives it at ~`page.tsx:7722`). `InventoryDevicesTab.tsx:124-145` builds
+   `fetchDevices = useCallback(…, [authHeaders, onDeviceCountChange])` and runs
+   `useEffect(() => { fetchDevices(); }, [fetchDevices])`. New headers object → new `fetchDevices` →
+   the effect refetches, and `fetchDevices` starts with `setLoading(true)`, which swaps the whole
+   `<tbody>` for the spinner row (`InventoryDevicesTab.tsx:370`, also `:627`). The shell re-renders on
+   every state change, including the 15 s booking poll, so the table refetches and flashes at least
+   that often while the tab is open.
+2. **Same defect, same pattern, elsewhere:** `InventoryProductsTab.tsx:120-141`
+   (`fetchProductSalesHistory`, `[authHeaders]`), `DeviceAuditLogsModal.tsx:~60` (`[authHeaders]`).
+   Grep every `components/admin/**` file for `authHeaders` / `headers` appearing in a hook
+   dependency array; there may be more.
+3. **Polls re-render the whole shell even when nothing changed.** The 15 s booking poll
+   (`page.tsx`, effect after the "Re-fetch bookings whenever branch selection changes" comment) calls
+   `setRequests(data)` / `setAllReservations(data)` with a freshly parsed array each time, and the 30 s
+   HR-alerts poll calls `setActiveMissingAlerts(data)`. A new array identity is a state change, so the
+   shell (≈350 `useState`, one component) and every child re-render every 15 s / 30 s even when the
+   data is identical.
+4. **Extracted views are not memoized.** `grep -rn "memo(" src/components/admin` finds nothing, so a
+   shell re-render re-renders every mounted view and its table.
+
+### Scope — three ordered parts, one PR each, stop after each for Mohamed to check
+
+**Part A — stable headers + quiet child refetch (the Devices fix).**
+1. In the shell, make `authenticatedJsonHeaders` a `useMemo` keyed on `session?.access_token`. It must
+   still carry the live token after a rotation (RISK-053): the memo key is the token, so it does.
+2. `InventoryDevicesTab`, `InventoryProductsTab` (sales history), `DeviceAuditLogsModal`: show the
+   loading row/spinner **only when there is no data yet**; a refetch with rows on screen runs quietly,
+   and a failed refetch keeps the rows. Use the same rule RISK-118 applied to customers/inventory
+   (`dbCustomersRef` pattern in `page.tsx`, "hadData"). After add/edit/reset-pulses writes
+   (`InventoryDevicesTab.tsx:~890, ~1115, ~1250`) the follow-up `fetchDevices()` must also be quiet.
+3. Do not change what the Devices table shows, its filters, the row menu or the modals.
+
+**Part B — a poll that found nothing new does not re-render.** In the shell, for `requests`,
+`allReservations`, `activeMissingAlerts` (and any other poll-fed state you find), keep the previous
+value when the new data is equal (cheap compare: length plus id/status/updated-at per row, or a stable
+JSON compare if rows are small; pick one and justify it in the PR). Must still update immediately when
+something really changed, including after a write the user just made.
+
+**Part B2 — supplement to Part B: the two child pollers Part B did not cover (added 2026-10-19 after
+reviewing commit `84ec0fb`).** Part B (`src/lib/pollEqual.ts`, `pollDataEqual`) is correct and stays as
+is, but it only covered the shell's polls. This brief said "and any other poll-fed state you find"; two
+pollers in child components were missed and are worse than the shell's:
+
+1. `src/components/admin/bookings/AdminBookingsView.tsx` (~`:341-420`, poll at ~`:405`): **every 3 s**
+   it runs `supabase.from("reservations").select("*")` with no limit, plus `providers`, `prescriptions`
+   and `/api/prescriptions`, then calls `setDbReservations`, `setDbProviders`, `setDbPrescriptions`
+   (~`:358, :361, :393`) with freshly parsed arrays. The Bookings screen (its table is the largest in
+   the app) re-renders every 3 s even when nothing changed. Most likely the biggest cause of the "table
+   refreshes inside the page" complaint on that screen.
+2. `src/components/admin/DoctorAccountView.tsx` (`fetchDoctorReservations`, ~`:513`; poll at ~`:542`):
+   **every 3 s**, `setReservations(doctorBookings)` with a new array (request is bounded by `?limit=250`).
+
+**Do, as its own commit separate from Part C:**
+- Apply the same keep-the-previous-value rule to every state those two polls set, using `pollDataEqual`
+  or a cheaper comparator **if you measure that it is needed.** `AdminBookingsView` compares an unbounded
+  table every 3 s, so a full `JSON.stringify` of prev and next may be costly as the clinic's history
+  grows. Measure it: build a 5,000-row and a 20,000-row `reservations` fixture, time the compare, and put
+  the numbers in the PR. If it costs more than roughly 20 ms per tick, use a cheaper check (row count
+  plus per-row `id` and `status`, or whatever columns actually change; `reservations` has no
+  `updated_at` as far as the migrations show, so confirm before relying on one) and say what it can
+  miss. Do not guess.
+- The optimistic local patches in `AdminBookingsView` (`setDbReservations(prev => …)` at ~`:1196` and
+  `:1221`) must keep working: server data that differs from the locally patched state must still replace
+  it, and a poll that equals the patched state must not flicker it back.
+- Realtime events and the `revera-booking-change` / `revera-prescription-change` window events must
+  still refresh immediately.
+- Grep `src/components/**` and `src/app/**` once more for `setInterval` / `setTimeout`-based pollers
+  and list any others you find in the PR. Fix only ones that set state from a fetch on a timer.
+
+**Do NOT, in B2:** change a polling interval, remove the polling, or switch these reads from the browser
+Supabase client to an API route. Instead report, in the PR description: (a) whether Supabase realtime
+already covers `reservations` (the channel at ~`:410` subscribes to `prescriptions`; check the rest) so
+the 3 s poll may be redundant, and (b) that Bookings downloads the whole `reservations` table every 3 s per
+open admin tab. Both are decisions for Mohamed. Also leave alone, but mention: `fetchAllReservations` in
+`page.tsx` has `if (calendarView === "Schedule") { fetchScheduleReservations(); }` after its `return`,
+so it never runs and the Schedule view does not refresh after writes. Do not fix it silently; it changes
+behavior.
+
+**Acceptance for B2:** with the Bookings screen open and idle for 60 s, a Profiler recording shows no
+commit of `AdminBookingsView` caused by a poll tick; approving, rejecting or creating a booking still
+updates the table within one tick; Doctor Account idle shows the same for its reservations list. Take
+Part C's "before" Profiler recording for the Bookings screen **before** B2 lands, then record B2's effect
+on the same recording, so the two parts are not mixed up.
+
+**Part C — `React.memo` only where measured.** With React DevTools Profiler, record the Bookings,
+Patients and Inventory screens idle for 60 s and with a booking approved. List the components that
+re-render with unchanged props. Wrap only the heaviest of those (candidates:
+`BookingDetailsModal` 5k lines, `AdminBookingsView`, `AdminEmployeesView`, `CustomerProfileDrawer`) in
+`React.memo`, and stabilize the props that defeat it (inline arrow functions and object/array
+literals passed from the shell → `useCallback` / `useMemo`). Include before/after commit counts in the
+PR. If a view cannot be memoized without large prop plumbing, leave it and say so.
+
+### Out of scope — do NOT do these in this brief
+- Moving state or fetchers out of the shell, a context/store, or splitting `page.tsx` further. That is
+  a separate decision (the shell owns state for many screens; this brief only stops the wasted work).
+- The permission refresh cadence (RISK-118 note: now on load and token rotation). Do not "fix" it here.
+- Changing any API route, the cache helper `src/lib/fetchCache.ts`, or auth flow code.
+
+### Acceptance
+- Devices tab open and idle for 60 s, Network panel filtered to `inventory/devices`: **no repeat
+  request** and **no spinner row** while the 15 s poll runs. Same for Products' sales history.
+- Adding a device, editing one, updating pulses and resetting pulses each still refresh the table
+  (quietly) and show the change.
+- A poll tick with no data change causes no re-render of the shell (show it in the Profiler).
+- Switching branch, first load, and an empty table still show the loading state as before.
+- `tsc` and `eslint` clean on touched files; full `vitest` run passes; add a test for any pure helper
+  you introduce (e.g. the "is the poll data equal" check).
+
+### Deliverables (standing project rules)
+Dev Notes block per `CLAUDE.md`; a manual checklist `ai_docs/manual_tests/RISK_119_…_MANUAL_TESTS.md`
+(next free number is RISK-119; confirm with `grep -n "^## RISK-1" ai_docs/RISKS.md | tail -3`); the
+RISKS entry in the same change. **Verify in a logged-in browser** — the author of this brief could
+not (no test login was available), so nothing above has been observed live, only read from code.
+
+
+---
+
 ### Brief 35 — Receptionist checkout owns the pulse deficit; the doctor screen only records pulses (completed 2026-09-25)
 
 Landed in the required order (the Method section's two phases): the server operation
