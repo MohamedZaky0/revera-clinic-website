@@ -25,6 +25,9 @@ import { checkIsLaserService } from "@/components/admin/bookings/BookingDetailsM
 import { resolveLaserPulseRate } from "@/lib/laserRate";
 import { extractPulsePackageQuota } from "@/lib/laserDeficit";
 
+// How often the doctor's reservation list is re-read while the tab is visible (RISK-136).
+const DOCTOR_POLL_MS = 15000;
+
 // Local Date Helper to avoid UTC conversion shifts
 const getLocalDateString = (d: Date = new Date()): string => {
   const y = d.getFullYear();
@@ -498,7 +501,10 @@ function DoctorAccountView({
     if (!silent) setLoading(true);
     doctorFetchInFlightRef.current = true;
     try {
-      const queryUrl = "/api/reservations?limit=250";
+      // No `limit`: the route returns every reservation and this view picks the doctor's own out
+      // client-side (isDoctorMatch), so a clinic-wide cap would silently drop the doctor's older
+      // bookings. A `limit=250` used to sit here but the route never honoured it (RISK-136).
+      const queryUrl = "/api/reservations";
       const headers = await getAuthHeaders();
       const res = await fetch(queryUrl, { headers });
       if (res.ok) {
@@ -522,15 +528,17 @@ function DoctorAccountView({
     }
   };
 
-  // Silent 3-second background polling & event listeners. Realtime does not reach the browser for this table
-  // (row-level security), so this poll is how reception's changes arrive. A tick is skipped while the tab is
+  // Silent 15-second background polling & event listeners. Realtime does not reach the browser for this table
+  // (row-level security), so this poll is how reception's changes arrive; the doctor's own actions and
+  // the booking/prescription events below refresh at once. A tick is skipped while the tab is
   // hidden or the previous request is still running, and the list refreshes as soon as the tab is visible.
+  // Every request costs a Supabase Auth check on the server, hence 15 s and not 3 s (RISK-136).
   useEffect(() => {
     fetchDoctorReservations();
     const interval = setInterval(() => {
       if (document.visibilityState !== "visible" || doctorFetchInFlightRef.current) return;
       fetchDoctorReservations(true);
-    }, 3000);
+    }, DOCTOR_POLL_MS);
 
     const onSync = () => fetchDoctorReservations(true);
     const onVisible = () => {

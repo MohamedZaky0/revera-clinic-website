@@ -14,7 +14,7 @@
 
 ## Status summary
 
-**9 open** · **13 partially resolved** · **105 resolved** · 127 tracked total.
+**9 open** · **13 partially resolved** · **106 resolved** · 128 tracked total.
 Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-partially-resolved) · [Resolved](#-resolved)
 
 ---
@@ -1269,6 +1269,7 @@ filled in with the above.
 - [RISK-133](#risk-133) — "Hard Delete" Of A Patient Looked Like It Did Nothing: The Patient Came Back From Its Bookings (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
 - [RISK-134](#risk-134) — Every Staff Request Asked The Supabase Auth Server To Check The Login, About 68,000 Auth Requests An Hour, Which Helped Keep The Production Database Unhealthy (RESOLVED ON DEV, NOT YET CONFIRMED ON PRODUCTION)
 - [RISK-135](#risk-135) — Doctors > Attendance Sent The Same Request Over And Over While The Tab Was Open (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER)
+- [RISK-136](#risk-136) — Admin Tabs Polled The Server Around The Clock, Hidden Or Not, And Staff Without Admin Rights Asked For Admin-Only Lists On Every Click (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
 
 ## RISK-003: Patient Auth Is Non-Functional
 
@@ -5722,3 +5723,42 @@ See `PROPOSALS.md` for:
 **Tests:** `tests/components/doctor/useProviderFormAttendance.test.tsx` mounts the hook with a mocked `fetch`: one GET on opening the tab and none after its own re-render, no GET on the Doctors tab, one more GET on a date change, one POST then one GET after a save, overlapping calls skipped, a stale reply ignored. Run against the old code, 6 of its 7 tests fail (the loop never settles).
 
 **Still to do:** confirm in the browser (Network tab on Doctors > Attendance, idle for a minute: one request). The Attendance tab itself is still not shown in the UI (see the "Dead Attendance plumbing" comment in the hook); this fix only stops the requests.
+
+## RISK-136: Admin Tabs Polled The Server Around The Clock, Hidden Or Not, And Staff Without Admin Rights Asked For Admin-Only Lists On Every Click (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
+
+**Manual test checklist:** `ai_docs/manual_tests/PAUSE_HIDDEN_POLLING_MANUAL_TESTS.md`
+
+**Severity:** High while production runs on the small (Nano) database (every API call costs at least one Supabase Auth check, so idle tabs add up) · **Type:** Performance / Operational
+**Found:** 2026-10-25, by a code audit while looking for what drove about 68,000 Auth requests an hour (see RISK-134, which removed the per-request Auth call on the server). The rates below are estimates read from the code, not measurements from production.
+
+**Cause (all four confirmed in the code):**
+1. **Booking poll** (`src/app/admin/page.tsx`, effect "Re-fetch bookings whenever branch selection changes"): a `setTimeout` chain every 15 s, two requests per cycle (`/api/reservations?status=pending&branchId=...` and `/api/reservations?branchId=...`), for every role, with no check of `document.hidden`, and also while the doctor screens were shown (they load their own reservations; the shell's lists were not on screen).
+2. **HR alerts poll** (same file, "Admin Missing Alerts Polling"): `setInterval` every 30 s for superadmin, admin and HR; no hidden-tab pause, no guard against a second request starting before the first answered.
+3. **Doctor poll** (`src/components/admin/DoctorAccountView.tsx`): `GET /api/reservations` every 3 s. It already skipped hidden tabs and overlapping requests. The URL carried `?limit=250`, but `GET /api/reservations` never read `limit`, so the clinic's whole reservation list came back every 3 s. The code comment in that file records that realtime does not reach the browser for this table (row-level security), so the poll is the only way reception's changes arrive.
+4. **Roles and employees for staff who cannot use them** (`fetchRolesAndEmployees` in `page.tsx`): `GET /api/roles` and `GET /api/employees` answer only to `superadmin` and `admin` (`requireAdministratorAccess`). Reception, doctors, HR and custom roles asked anyway on login and again on every navigation click (the effect re-runs while the employee list stays empty), got 403, waited 2 s and asked again: four wasted requests per click.
+
+**Fix:**
+- `src/lib/visiblePoll.ts` (`startVisiblePoll`): runs a task every N ms while the tab is visible; keeps no timer and makes no request while hidden; when the tab is shown again it runs the task once at once if the data is older than one interval (a quick alt-tab does not refetch); never starts a run while the previous one is unfinished. The booking poll (15 s) and the HR alerts poll (30 s, first run immediate) use it. The booking effect now does nothing while the doctor screens are shown and starts again (with a fresh load) when an admin switches back (`showDoctorWorkspace` moved above the effect).
+- Doctor view: interval 3 s -> 15 s (`DOCTOR_POLL_MS`); hidden-tab and in-flight guards unchanged; the refreshes after the doctor's own actions and on the booking/prescription events are unchanged and still immediate. The misleading `?limit=250` was removed (see below).
+- `src/lib/adminDirectory.ts`: `canLoadAdminDirectory(role)` is true only for `superadmin` and `admin`, the two values `/api/auth/me` returns in the same normalised form the server checks. `fetchRolesAndEmployees` does nothing for any other role, and a 401 or 403 is never retried (other failures keep the old single retry after 2 s).
+
+**Estimated requests per minute per tab (from the code):**
+
+| Tab | Before | After |
+|---|---|---|
+| Admin, visible | 8 booking + 2 HR alerts = 10 | 10 (unchanged: still 15 s and 30 s) |
+| Admin, hidden / forgotten overnight | 10 | 0 (one refresh of 3 requests when shown again after 30 s or more) |
+| Doctor screens, visible | 8 shell + 20 doctor = 28 | 4 |
+| Doctor screens, hidden | 8 shell | 0 |
+| Reception, visible and idle | 8 | 8 (hidden: 0) |
+| Reception / doctor, per navigation click | 4 refused requests to roles and employees | 0 |
+
+**Decided not to do: make `GET /api/reservations` honour `limit`.** It is small to build but unsafe with this caller: the route returns the whole clinic and the doctor view picks its own bookings client-side, so a cap of 250 (newest first) would drop a doctor's older or upcoming bookings once the clinic has more than 250. The param was simply removed from the doctor view. A real saving there needs a server-side doctor filter (`doctorId` already exists on the route, but its name matching differs from the view's `isDoctorMatch`), which is a separate change.
+
+**Behaviour change to know about:** a doctor now sees a change made by reception up to 15 s later instead of 3 s (their own actions still refresh at once). If that is too slow in practice, lowering `DOCTOR_POLL_MS` is a one-line change.
+
+**Not changed:** `src/lib/access.ts`, `src/lib/auth.ts`, `src/middleware.ts`, `/api/auth/me`, `src/lib/verifyToken.ts` (RISK-134), the attendance code (RISK-135), the public site; other timers in `page.tsx` (presence check, session retry, checkout) are local or already conditional.
+
+**Tests:** `tests/components/visiblePoll.test.tsx` (interval, hidden tab makes no call and no timer, one refetch on visible, quick alt-tab does not refetch, in-flight guard, disabled poll), `tests/lib/adminDirectory.test.ts` (no request for non-admin roles, no retry after 401/403, one retry otherwise), `tests/lib/pausedPollingWiring.test.ts` (source wiring of the three call sites, since the admin page is too large to mount), and the cadence tests in `tests/components/doctor/DoctorAccountView.test.tsx` were updated from 3 s to 15 s.
+
+**Still to do:** confirm in a real browser with the Network tab (checklist) and, after a deploy, in the Supabase Auth and Vercel request metrics over a day.

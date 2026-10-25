@@ -3987,3 +3987,21 @@ A patient that exists only in the list because of bookings (`res-cust-<phone>`, 
 **Rejected:** verifying in middleware as well with `jose` (a second implementation, a new direct dependency, no extra security because the handler re-checks); caching the employee row (would delay DEC-117 deactivation); revoking the old HS256 signing key (the legacy `anon` / `service_role` API keys are HS256 JWTs).
 
 **Tests:** `tests/lib/verifyToken.test.ts`, `tests/routes/local-jwt-verification.test.ts`, `tests/routes/middleware-auth.test.ts`. Manual checklist: `ai_docs/manual_tests/LOCAL_JWT_VERIFICATION_MANUAL_TESTS.md`.
+
+## DEC-130: Browser Polls Pause In A Hidden Tab, The Doctor Poll Is 15 s, And Only Admins Ask For The Roles And Employees Lists
+
+**Date:** 2026-10-25 · **Status:** Done on dev (branch `perf/pause-hidden-polling`); not yet on production · **Related:** RISK-136, RISK-134, DEC-113
+
+**Decision:**
+1. Background polls in the admin go through one helper, `startVisiblePoll` (`src/lib/visiblePoll.ts`): no request and no timer while the tab is hidden; one refresh when it is shown again if the data is older than the interval; never two runs at once. Used by the shell's booking poll (15 s) and the HR alerts poll (30 s).
+2. The shell's booking poll (and its first load) does not run while the doctor screens are displayed, because they load their own reservations. Switching back to the admin view reloads.
+3. The doctor view polls every 15 s (was 3 s) while visible. The hidden-tab and in-flight guards stay. `?limit=250` is removed from its request because the route ignores it and honouring it would hide a doctor's older bookings (the route is not changed).
+4. `/api/roles` and `/api/employees` are requested only when the signed-in role is `superadmin` or `admin` (`canLoadAdminDirectory`, mirroring `requireAdministratorAccess`), and a 401/403 is never retried.
+
+**Why:** RISK-136. Each API call costs at least one Supabase Auth check; forgotten and hidden tabs, the 3 s doctor poll and the refused-then-retried admin lists were a large share of the load on the Nano database. The data a person sees while looking at the screen is refreshed exactly as often as before for admins and reception (15 s, 30 s).
+
+**Rejected:** a long-lived shared worker or server push for bookings (more moving parts than the problem needs now); a 60 s poll for everyone (too slow for reception, who rely on it to see website requests); a `limit` on `GET /api/reservations` (see RISK-136); a role check by name guessing on the client (the server's own two normalised values are used).
+
+**Trade-off:** a doctor sees reception's changes up to 15 s later than before. Realtime does not reach the browser for reservations (row-level security), so there is no faster path today; a server-side doctor filter or a policy that lets realtime through would allow a shorter interval at lower cost.
+
+**Tests:** `tests/components/visiblePoll.test.tsx`, `tests/lib/adminDirectory.test.ts`, `tests/lib/pausedPollingWiring.test.ts`, `tests/components/doctor/DoctorAccountView.test.tsx` (cadence updated to 15 s). Manual checklist: `ai_docs/manual_tests/PAUSE_HIDDEN_POLLING_MANUAL_TESTS.md`.
