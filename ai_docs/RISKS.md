@@ -5630,7 +5630,7 @@ See `PROPOSALS.md` for:
 
 **Not found:** why individual requests stall. Candidates: the Supabase free plan's shared resources, or a stale reused connection inside a function instance. Neither could be confirmed because neither the Supabase logs nor the Vercel project are reachable from the tools used here.
 
-**Mitigation (DEC-126):** server-side reads to Supabase that have not answered within 8 s are cut and asked again (twice at most); writes are never repeated. The admin's session check also gives up on a stalled `/api/auth/me` after 10 s and uses its existing retry.
+**Mitigation (DEC-126):** server-side reads to Supabase (and the middleware auth check) that have not answered within 3.5 s are cut and asked again (3 times at most), each cut logged as `[supabase-stall]`; writes are never repeated. The admin's session check also gives up on a stalled `/api/auth/me` after 10 s and uses its existing retry.
 
 **Open:** if stalls still show in Vercel logs after this, read Supabase's Auth and API logs in the dashboard around the stall time, and consider the Pro plan (dedicated compute; also daily backups, which the free plan does not give).
 

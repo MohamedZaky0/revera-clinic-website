@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { createStallGuardFetch } from '@/lib/stallGuardFetch';
 
 // Protected administrative API path prefixes that require authentication
 const PROTECTED_API_PREFIXES = [
@@ -14,6 +15,13 @@ const PROTECTED_API_PREFIXES = [
 // today, so a blanket prefix match on '/api/inventory/products/sales' would 401 that read
 // and break the sales history display. The POST (creating a sale) is instead protected at
 // the handler level in that route file. See RISK-018 / FINANCE_TRACKER 0.10.
+
+// RISK-131: this check calls Supabase for every protected request; a stalled call used to hold the
+// request until the platform killed it after 25 s. A read that has not answered is cut and repeated.
+const stallGuardedFetch = createStallGuardFetch({
+  onRetry: ({ url, attempt, stalled }) =>
+    console.warn(`[supabase-stall] middleware: ${stalled ? 'no answer' : 'connection dropped'} from ${url}, attempt ${attempt} cut, asking again`),
+});
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -37,7 +45,7 @@ export async function middleware(request: NextRequest) {
 
     let authResponse: Response;
     try {
-      authResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      authResponse = await stallGuardedFetch(`${supabaseUrl}/auth/v1/user`, {
         headers: {
           apikey: supabaseAnonKey,
           authorization: `Bearer ${token}`,

@@ -15,7 +15,12 @@ export const supabaseServer = (supabaseUrl && serviceRoleKey)
         flowType: "pkce",
       },
       // RISK-131: a read to Supabase that stalls is cut after a few seconds and asked again.
-      global: { fetch: createStallGuardFetch() },
+      global: {
+        fetch: createStallGuardFetch({
+          onRetry: ({ url, attempt, stalled }) =>
+            console.warn(`[supabase-stall] ${stalled ? 'no answer' : 'connection dropped'} from ${url}, attempt ${attempt} cut, asking again`),
+        }),
+      },
     })
   : null as any;
 

@@ -13,6 +13,19 @@ export interface StallGuardOptions {
   baseFetch?: typeof fetch;
   stallMs?: number;
   retries?: number;
+  /** Called each time a read is cut and about to be asked again (for the server log). */
+  onRetry?: (info: { url: string; attempt: number; stalled: boolean }) => void;
+}
+
+/** Host and path only: never the query string, which can carry personal data. */
+function describeUrl(input: RequestInfo | URL): string {
+  try {
+    const raw = typeof input === 'string' ? input : input instanceof URL ? input.href : (input as Request).url;
+    const u = new URL(raw);
+    return `${u.host}${u.pathname}`;
+  } catch {
+    return 'unknown';
+  }
 }
 
 function methodOf(input: RequestInfo | URL, init?: RequestInit): string {
@@ -22,8 +35,10 @@ function methodOf(input: RequestInfo | URL, init?: RequestInit): string {
 }
 
 export function createStallGuardFetch(options: StallGuardOptions = {}): typeof fetch {
-  const stallMs = options.stallMs ?? 8000;
-  const retries = options.retries ?? 2;
+  // A healthy Supabase answer takes 0.1-0.5 s, so 3.5 s is generous; 3 repeats keep the worst case
+  // (4 x 3.5 s = 14 s) under the 25 s the platform allows a function.
+  const stallMs = options.stallMs ?? 3500;
+  const retries = options.retries ?? 3;
 
   return async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const baseFetch = options.baseFetch ?? fetch;
@@ -52,6 +67,7 @@ export function createStallGuardFetch(options: StallGuardOptions = {}): typeof f
         if (outer?.aborted || attempt >= retries) throw error;
         if (!stalled && !(error instanceof TypeError)) throw error;
         // a stall or a dropped connection: ask again
+        options.onRetry?.({ url: describeUrl(input), attempt: attempt + 1, stalled });
       } finally {
         clearTimeout(timer);
         outer?.removeEventListener('abort', forwardAbort);
