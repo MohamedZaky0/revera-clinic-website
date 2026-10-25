@@ -90,7 +90,8 @@ interface AdminEmployeesViewProps {
   customerAvatars: Record<string, string>;
   handleAvatarUpload: (key: string, file: File) => Promise<void> | void;
   handleAvatarRemove: (key: string) => void;
-  allServicesList: { id: number; en: string; ar?: string }[];
+  allServicesList: { id: number; en: string; ar?: string; cat?: string }[];
+  serviceCategories?: { key: string; en: string; ar?: string }[];
   session: any;
   adminDbId?: string;
   adminEmail?: string;
@@ -139,6 +140,7 @@ export default function AdminEmployeesView({
   handleAvatarUpload,
   handleAvatarRemove,
   allServicesList,
+  serviceCategories,
   session,
   adminDbId,
   adminEmail,
@@ -2165,6 +2167,7 @@ export default function AdminEmployeesView({
                   {/* Row 5: Services & Commission */}
                   <DoctorServiceCommissionEditor
                     allServices={allServicesList}
+                    categories={serviceCategories}
                     services={newEmployeeSelectedServices}
                     commissions={newEmployeeServiceCommissions}
                     defaultType={newEmployeeCommissionType as DefaultCommissionType}
