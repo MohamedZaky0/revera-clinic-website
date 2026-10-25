@@ -1886,7 +1886,11 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
         const verification = await verifyStaffSession({
           session: currSession,
           fetchMe: async (accessToken) => {
-            const res = await fetch('/api/auth/me', { headers: { 'Authorization': `Bearer ${accessToken}` } });
+            // RISK-131: do not wait for a stalled answer; a cut request counts as a network failure and is retried.
+            const res = await fetch('/api/auth/me', {
+              headers: { 'Authorization': `Bearer ${accessToken}` },
+              signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(10000) : undefined,
+            });
             const skew = clockSkewMs(res.headers.get('date'));
             setClockSkew(skew);
             if (isClockSkewed(skew)) trail(`clock off vs server: ${Math.round((skew as number) / 60000)} min`);

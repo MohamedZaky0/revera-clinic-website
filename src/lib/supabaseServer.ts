@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { createStallGuardFetch } from "@/lib/stallGuardFetch";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
@@ -13,6 +14,8 @@ export const supabaseServer = (supabaseUrl && serviceRoleKey)
         persistSession: false,
         flowType: "pkce",
       },
+      // RISK-131: a read to Supabase that stalls is cut after a few seconds and asked again.
+      global: { fetch: createStallGuardFetch() },
     })
   : null as any;
 
