@@ -5632,3 +5632,16 @@ See `PROPOSALS.md` for:
 **Mitigation (DEC-126):** server-side reads to Supabase that have not answered within 8 s are cut and asked again (twice at most); writes are never repeated. The admin's session check also gives up on a stalled `/api/auth/me` after 10 s and uses its existing retry.
 
 **Open:** if stalls still show in Vercel logs after this, read Supabase's Auth and API logs in the dashboard around the stall time, and consider the Pro plan (dedicated compute; also daily backups, which the free plan does not give).
+
+## RISK-132: Total Spend / Outstanding In The Patient Profile Kept Changing Back And Forth (FIXED ON DEV)
+
+**Manual test checklist:** `ai_docs/manual_tests/PATIENT_PROFILE_NUMBERS_STABLE_MANUAL_TESTS.md`
+
+**Severity:** Medium (wrong-looking money numbers, no data lost) · **Type:** UI state / data display
+**Found:** 2026-10-25, reported by the owner on production for the patient "hazem al hadary": opening the profile, the money numbers kept changing instead of staying put.
+
+**Cause:** two effects in `src/app/admin/page.tsx` both wrote the open profile's money fields. One copied the raw stored `customers` row (`spent_amount`, `outstanding`, `wallet_balance`), the other the derived row (stored vs bookings, DEC-121). For this patient the stored row says spent 0 / outstanding 2820 while the bookings say paid 2700 / owed 2920, so the two sources never agreed: each effect's write made the other effect fire, which wrote its own values back, and so on for as long as the drawer was open. Every patient whose stored and calculated figures differ (DEC-121 measured 8 of 102 on production for outstanding; spend was not counted) was exposed. It appeared on 2026-10-21 when DEC-121 added the derived writer next to the raw one.
+
+**Fix (DEC-127):** the raw writer is gone; one hook writes the derived numbers and stops once the profile matches. Regression tests: `tests/components/patients/OpenProfileFinancialSync.test.tsx` (settles on 2700/2920, reproduces the alternation with a second writer) and `tests/lib/profileFinancialWriters.test.ts` (page has a single writer).
+
+**Still true:** the number shown is the larger of the stored value and the bookings' value (DEC-121). If a stored figure is too high or too low, it is corrected through "Adjust financials" or by fixing the bookings, not by this fix.

@@ -3940,3 +3940,15 @@ into this app for the production environment.
 **Why:** RISK-131. Most requests take 0.2 s and a few stall for 20-45 s or until the platform kills the function at 25 s; a repeat nearly always succeeds at once. A read is the same read twice, so repeating it is safe.
 
 **Cost / limits:** a read that legitimately needs more than 8 s to start answering now fails after about 24 s instead of succeeding (no such read is known; reports and lists answer in well under a second). Writes can still stall; the person sees an error and retries. This hides the symptom, it does not find the cause.
+
+## DEC-127: The Open Patient Profile Has One Writer For Its Money Numbers (Derived Stored-vs-Bookings Value)
+
+**Date:** 2026-10-25 · **Status:** Done on dev; not yet on production · **Related:** RISK-132, DEC-121
+
+**Decision:** while the Patient Profile drawer is open, its Total Spend, Outstanding, Wallet and booking count are written by exactly one effect, `useOpenProfileFinancialSync` (`src/components/admin/patients/useOpenProfileFinancialSync.ts`), called in `src/app/admin/page.tsx` right after the derived `customers` memo. It copies the row of the derived list (stored value vs what the bookings say, DEC-121), and writes only when something differs. The older effect that copied the RAW stored `dbCustomers` record into the same state was removed.
+
+**Why:** RISK-132. The two effects disagreed whenever a patient's stored figures differ from the calculated ones, so each undid the other on every render and the numbers flickered for as long as the drawer stayed open. DEC-121 had added the derived writer without removing the raw one that came from an earlier fix the same day.
+
+**Rule for future work:** do not add another code path that writes `spent_amount` / `spent` / `outstanding` / `wallet_balance` of `viewingCustomerProfile` from a different source. `tests/lib/profileFinancialWriters.test.ts` fails if the raw writer returns.
+
+**Limits:** after a manual "Adjust financials" the drawer shows the typed values only until the next sync; the sync then shows the derived value of the refreshed list (which is the same number once the save has been read back). Not changed here.
