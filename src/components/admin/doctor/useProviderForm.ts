@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Branch } from "@/types";
 import { ServiceCommissionEntry } from "@/components/admin/services/DoctorServiceCommissionEditor";
 import { clearFetchCache } from "@/lib/fetchCache";
+import { mayOverlap, type ShiftKind } from "@/lib/shiftOverlap";
 
 interface UseProviderFormParams {
   branches: Branch[];
@@ -445,6 +446,15 @@ export function useProviderForm({
           const s2 = dayShifts[j];
 
           if (s1.startMins < s2.endMins && s2.startMins < s1.endMins) {
+            // DEC-115: an In-Clinic shift and an Online shift at the SAME branch are allowed to
+            // overlap (the doctor is physically there and also reachable online) — this duplicates
+            // the exception AdminEmployeesView.tsx already enforces via mayOverlap(), which this
+            // separate Doctors-page form never picked up, so it kept rejecting the same schedule.
+            const kind1: ShiftKind = s1.type === 'In-Clinic' ? 'in_clinic' : 'online';
+            const kind2: ShiftKind = s2.type === 'In-Clinic' ? 'in_clinic' : 'online';
+            if (mayOverlap({ branchId: s1.branchId, kind: kind1 }, { branchId: s2.branchId, kind: kind2 })) {
+              continue;
+            }
             alert(`Schedule overlap detected on ${day}!\nDoctor cannot be scheduled at "${s1.branchName}" (${s1.type}: ${s1.startStr} - ${s1.endStr}) and "${s2.branchName}" (${s2.type}: ${s2.startStr} - ${s2.endStr}) at the same time.`);
             return;
           }
