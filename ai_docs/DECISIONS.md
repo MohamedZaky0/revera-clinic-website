@@ -4052,9 +4052,9 @@ A patient that exists only in the list because of bookings (`res-cust-<phone>`, 
 
 ---
 
-## DEC-131: Permanently Deleting A Booking Also Deletes Its Payments And Invoice And Takes Its Share Out Of The Patient's Figures
+## DEC-133: Permanently Deleting A Booking Also Deletes Its Payments And Invoice And Takes Its Share Out Of The Patient's Figures
 
-**Date:** 2026-10-25 · **Status:** Done on dev (branch `fix/booking-hard-delete-cascade`); not yet on production; **no migration** · **Related:** RISK-137, DEC-121, DEC-127, DEC-128
+**Date:** 2026-10-25 · **Status:** Done on dev (branch `fix/booking-hard-delete-cascade`); not yet on production; **no migration** · **Related:** RISK-139, DEC-121, DEC-127, DEC-128
 
 **Decision:** `DELETE /api/reservations?id=<id>&mode=hard` (superadmin only, unchanged) now calls `hardDeleteBooking` (`src/lib/bookingHardDelete.ts`). In order, with an undo for each step that can be undone:
 1. reads the booking, its patient, its ledger invoice(s) and their payments, its `transactions` rows and the package sessions it consumed. A failed read changes nothing;
@@ -4072,7 +4072,7 @@ A failure in steps 2 to 5 undoes the earlier steps (figures restored, sessions t
 
 **Not done on purpose:**
 - **Wallet** is not reversed. A previous booking that was underpaid may have used wallet credit first, an overpayment may have settled other debt or credited the wallet; the amounts are not stored on the booking. Wallet-type `transactions` rows are kept for the same reason (they describe the wallet, which did not move back).
-- **Pulse (laser) package usage** (`package_pulse_usage`, `customer_packages.pulses_used`) and package usage of **previous (historical) bookings** are not given back: they are not tied to a `package_revenue_recognitions` receipt, so a reversal would be a guess. Follow-up, RISK-137.
+- **Pulse (laser) package usage** (`package_pulse_usage`, `customer_packages.pulses_used`) and package usage of **previous (historical) bookings** are not given back: they are not tied to a `package_revenue_recognitions` receipt, so a reversal would be a guess. Follow-up, RISK-139.
 - `product_sales` rows (no link to the booking in the schema), `medical_records`, `prescriptions`, `laser_pulse_logs` stay and just lose the link, as before. `wallet_txns` stay.
 - Not atomic: Supabase's API has no multi-statement transaction, so the sequence above is the substitute. A Postgres function would make it atomic, but it could not be run or tested here without writing to a database.
 - A manual transaction that was created through the API with a `reservation_id` also moved the totals itself; the screens never send that field, so it is not reversed separately.

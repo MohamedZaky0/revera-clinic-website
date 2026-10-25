@@ -5820,7 +5820,7 @@ See `PROPOSALS.md` for:
 
 **Open (owner decision):** whether a permanent delete should be able to remove a patient together with their bookings and payments (for test data). Not built: it would erase income and visit history with no way back. Options: (a) keep as is, test data is cleaned by deleting its bookings first; (b) a separate superadmin-only "delete test patient and everything" action that lists what will be erased and asks to type the patient's name.
 
-## RISK-137: Permanently Deleting A Booking Left Its Payments And Money In The Patient's Figures (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
+## RISK-139: Permanently Deleting A Booking Left Its Payments And Money In The Patient's Figures (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
 
 **Manual test checklist:** `ai_docs/manual_tests/BOOKING_HARD_DELETE_CASCADE_MANUAL_TESTS.md`
 
@@ -5829,7 +5829,7 @@ See `PROPOSALS.md` for:
 
 **Cause (code and production SELECTs only):** the route ran `delete from reservations where id = ...`. `transactions.reservation_id` and `invoices.reservation_id` are `ON DELETE SET NULL`, so the payments (TXN-001073 amount 1200, TXN-001074 amount 1500) and the booking invoices (3 invoices, 2 payments) stayed as orphans. `customers.spent_amount` / `outstanding` / `number_of_bookings` are running totals moved by deltas in several routes and nothing moved them back. The Patients list falls back to the stored count when a patient has no bookings left, and shows the larger of the stored and the booking-derived money (DEC-121), so the stored leftovers were what stayed on screen. The orphan invoices also keep counting in finance reports (receivables aging reads issued invoices by patient), and Settle Debt would still offer to settle them.
 
-**Fix:** DEC-131 (no migration).
+**Fix:** DEC-133 (no migration).
 
 **Left over on production for this patient (nothing was changed by this fix, the owner decides):** 0 bookings; customers row `spent_amount` 2700, `outstanding` 2920, `number_of_bookings` 3; 2 transactions with no booking (TXN-001073, TXN-001074); 3 invoices with no booking (INV-000083 1200, INV-000084 1600, INV-000121 2820) with 2 payments (1200, 1500); 3 wallet entries (5520 in, 100 out, 5420 out; wallet balance 0); 3 active customer packages. The new delete would have taken these out with each booking; for the ones already deleted they have to be cleaned by hand (or a one-off script the owner approves).
 
