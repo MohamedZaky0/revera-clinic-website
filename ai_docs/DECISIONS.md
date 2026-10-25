@@ -3955,7 +3955,7 @@ into this app for the production environment.
 
 ## DEC-128: Permanent Delete Of A Patient Is Refused While Bookings, Payments Or Other History Hang Off It; The Reason Is Named
 
-**Date:** 2026-10-25 · **Status:** Done on dev (branch `fix/patient-hard-delete`); not yet on production · **Related:** RISK-133, DEC-074 (reservation-derived patients), PRODUCT_RULES "Deletion Rules"
+**Date:** 2026-10-25 · **Status:** SUPERSEDED by DEC-130 (the refusal rule is withdrawn; the 404, the checked row delete and the login-after-row order are kept) · **Related:** RISK-133, DEC-074 (reservation-derived patients), PRODUCT_RULES "Deletion Rules"
 
 **Decision:** `DELETE /api/customers?id=X&mode=hard` (superadmin only, unchanged) now:
 1. answers `404` if the patient row does not exist (it used to answer "deleted successfully" for nothing);
@@ -4023,3 +4023,29 @@ A patient that exists only in the list because of bookings (`res-cust-<phone>`, 
 **Accepted cost:** a CMS edit can take up to 60 s (plus the stale-while-revalidate window) to show to visitors.
 
 **Tests:** `tests/routes/public-read-caching.test.ts`, `tests/components/BookingModalLazyLoad.test.tsx`, `tests/components/publicPageSettings.test.tsx`. Manual checklist: `ai_docs/manual_tests/PUBLIC_READ_CACHING_MANUAL_TESTS.md`.
+
+## DEC-132: Permanent Delete Of A Patient Deletes Everything That Belongs To Them (Supersedes DEC-128); The Superadmin Sees The Counts First
+
+**Date:** 2026-10-25 · **Status:** Done on dev (branch `fix/patient-hard-delete-everything`); not yet on production · **Supersedes:** DEC-128 · **Related:** RISK-138, RISK-133, DEC-074 (reservation-derived patients), PRODUCT_RULES "Deletion Rules"
+
+**Decision (owner, superadmin):** when a patient is permanently deleted, everything that belongs to them is deleted with them: bookings, payments (transactions, invoices and their payment rows, product sales), packages, wallet entries, product balances, laser logs, medical records, medical reports and prescriptions. The patient must not come back in the Patients list. DEC-128 (refuse while history exists, answer `409 PATIENT_HAS_HISTORY`) is withdrawn. Soft delete (Deactivate) is unchanged.
+
+**How (`src/lib/customerDeletion.ts`, `DELETE /api/customers?mode=hard`, still superadmin only):**
+1. `404` if the patient row does not exist (unchanged).
+2. A plan is built first (read only): the patient's bookings by `customer_id`, plus un-linked bookings (`customer_id` NULL) that carry the patient's phone (last 9 digits compared) **only if** no other patient row owns that phone and the booking's name is the same or contains / is contained in the patient's name (a booking with the same phone but clearly another name is kept and reported as `keptBookingsOtherName`). The patient's payments are the transactions and invoices with the patient's `customer_id` or with the `reservation_id` of a booking being deleted (and `customer_id` NULL or the patient), plus the patient's product sales.
+3. Deletion order, one request per table, patient row last: `transactions` -> `payments` (rows of those invoices) -> `invoices` (invoice lines cascade) -> `product_sales` -> `wallet_txns` -> `customer_packages` (package items, pulse usage and revenue recognitions cascade) -> `customer_product_balances` -> `laser_pulse_logs` -> `medical_records` -> `medical_reports` -> `prescriptions` -> `reservations` -> `customers`. Every table is deleted explicitly instead of relying on `ON DELETE` rules, because the dev and production databases were built by different paths (RISK-020) and so the counts are exact.
+4. A failing step stops the run and is reported: `500 { code: "PATIENT_DELETE_FAILED", failedStep, removedSoFar, error }`. Nothing after it runs, and the Auth login is not touched. Because the patient row goes last, the patient is still in the list and the delete can simply be run again; it is idempotent.
+5. Only after the row is gone, the linked Auth user is removed (by `auth_user_id`, else e-mail/phone match). A login that belongs to an `employee_accounts` row is never removed (unchanged guard).
+6. The response is `{ message, removed: { bookings, payments, paymentsAmount, packages, walletEntries, productBalances, laserSessions, clinicalRecords }, keptBookingsOtherName }` and the server logs one line `patient hard delete: id=... by=... bookings=... payments=...`.
+
+**Booking-derived entry (`res-cust-<phone>`, no patient row):** hard delete deletes the un-linked bookings that carry that phone, plus their transactions and invoices, so the entry disappears (`404` if none is left; `409 PATIENT_RECORD_EXISTS` if a patient row now owns that phone, i.e. the list on screen is stale; `400` if the id has no usable phone). Soft delete stays `409 PATIENT_IS_BOOKING_DERIVED` (there is no row to deactivate) with a clearer message that points to Hard Delete or the Bookings screen.
+
+**Preview (`GET /api/customers?id=<id>&deletePreview=1`, superadmin only, read only):** `{ patientId, derived, name, counts: { bookings, payments, paymentsAmount, packages, walletEntries, productBalances, laserSessions, clinicalRecords }, keptBookingsOtherName }`. `payments` = transactions + invoices + product sales; `paymentsAmount` = completed money-in transactions (payment, outstanding_payment, product_purchase, wallet_topup) from the ledger, so it is an indication and not a reconciled total. The admin Delete Customer dialog (`src/app/admin/page.tsx`, English and Arabic) loads it when it opens; "Hard Delete" first shows "This will permanently delete: 3 bookings, 2 payment records (2,700 EGP), ..." with a red "Yes, permanently delete everything" button, and is unavailable if the preview could not be loaded. `src/lib/customerDeletionText.ts` holds the sentence builder.
+
+**Why:** RISK-138. The owner wants test and mistaken patients gone completely, not hidden. DEC-128's rule left them undeletable once they had a booking.
+
+**No migration, no schema change.** The foreign keys are left as they are. The deletion is a sequence of requests, not one database transaction (an RPC was considered for atomicity and not built: it could not be tested against a real database in this work, and the ordered, retryable sequence has the same end state).
+
+**Limits / consequences (accepted):** income recorded for this patient disappears from finance reports; inventory is not put back for the product sales and consumables of the deleted bookings; there is no undo. Un-linked product sales that only carry the patient's phone are not found. Other staff screens that already hold the patient in memory refresh on their next poll.
+
+**Tests:** `tests/routes/customers-hard-delete.test.ts` (everything is deleted, another patient and another booking's payment untouched, staff login guard, 404, failing step reported, derived entry disappears, preview counts), `tests/lib/customerDeletionText.test.ts`. Manual checklist: `ai_docs/manual_tests/PATIENT_HARD_DELETE_EVERYTHING_MANUAL_TESTS.md`.

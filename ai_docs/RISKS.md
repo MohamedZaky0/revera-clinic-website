@@ -1266,11 +1266,12 @@ filled in with the above.
 - [RISK-127](#risk-127) — The Doctor Portal Briefly Showed Every Doctor's Patients On First Load (RESOLVED, NOT YET CONFIRMED ON PRODUCTION)
 - [RISK-128](#risk-128) — The Public Browser Key Could Read Staff Accounts, Salaries, Attendance, Prescriptions And More — And Write Or Delete Accounts And Roles (RESOLVED ON DEV AND PRODUCTION; PRODUCTION SCREENS NOT YET RE-CHECKED BY THE OWNER)
 - [RISK-129](#risk-129) — Patients Who Paid Showed "Total Spend 0" (RESOLVED, NOT YET CONFIRMED ON PRODUCTION)
-- [RISK-133](#risk-133) — "Hard Delete" Of A Patient Looked Like It Did Nothing: The Patient Came Back From Its Bookings (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
+- [RISK-133](#risk-133) — "Hard Delete" Of A Patient Looked Like It Did Nothing: The Patient Came Back From Its Bookings (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION; THE FIX WAS REPLACED BY RISK-135 / DEC-130)
 - [RISK-134](#risk-134) — Every Staff Request Asked The Supabase Auth Server To Check The Login, About 68,000 Auth Requests An Hour, Which Helped Keep The Production Database Unhealthy (RESOLVED ON DEV, NOT YET CONFIRMED ON PRODUCTION)
 - [RISK-135](#risk-135) — Doctors > Attendance Sent The Same Request Over And Over While The Tab Was Open (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER)
 - [RISK-136](#risk-136) — Admin Tabs Polled The Server Around The Clock, Hidden Or Not, And Staff Without Admin Rights Asked For Admin-Only Lists On Every Click (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
 - [RISK-137](#risk-137) — Every Public Page View Cost About 12 API Calls And 15 Database Queries, Nothing Was Cached, And The Booking Popup Loaded Six Reads On Pages That Never Show It (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
+- [RISK-138](#risk-138) — A Patient With Bookings Could Not Be Deleted For Good; The Owner's Rule Is That Permanent Delete Removes Everything (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
 
 ## RISK-003: Patient Auth Is Non-Functional
 
@@ -5669,7 +5670,7 @@ See `PROPOSALS.md` for:
 
 **To clear the existing "Hamada Test" entry on production:** nothing in this change deletes data. Delete (or cancel) its one booking from the Bookings screen as superadmin and the entry disappears. That booking has 1 transaction linked to it (the transaction stays, with no booking), which is for the owner to accept.
 
-**Open (owner decision):** whether a permanent delete should be able to remove a patient together with their bookings and payments (for test data). Not built: it would erase income and visit history with no way back. Options: (a) keep as is, test data is cleaned by deleting its bookings first; (b) a separate superadmin-only "delete test patient and everything" action that lists what will be erased and asks to type the patient's name.
+**Decided 2026-10-25 (owner):** a permanent delete removes the patient together with their bookings and payments. The refusal built here (DEC-128) is replaced by DEC-130 / RISK-136; the cause analysis above still holds.
 
 ## RISK-134: Every Staff Request Asked The Supabase Auth Server To Check The Login, About 68,000 Auth Requests An Hour, Which Helped Keep The Production Database Unhealthy (RESOLVED ON DEV, NOT YET CONFIRMED ON PRODUCTION)
 
@@ -5797,3 +5798,21 @@ See `PROPOSALS.md` for:
 **Tests:** `tests/routes/public-read-caching.test.ts` (header on anonymous GET, absence with a junk token and with a staff token, unchanged JSON, no header on error or fallback, providers uncached), `tests/components/BookingModalLazyLoad.test.tsx` (no fetch on mount while closed, six on first open and none on the second, `/book` loads at once, deferred open is replayed), `tests/components/publicPageSettings.test.tsx` (shared in-flight request, 5-minute TTL, invalidation, no failure caching).
 
 **Still to do:** confirm on a Vercel preview that the response headers reach the browser and that `x-vercel-cache` shows HIT for the anonymous request; run the manual checklist.
+
+## RISK-138: A Patient With Bookings Could Not Be Deleted For Good; The Owner's Rule Is That Permanent Delete Removes Everything (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
+
+**Manual test checklist:** `ai_docs/manual_tests/PATIENT_HARD_DELETE_EVERYTHING_MANUAL_TESTS.md`
+
+**Severity:** Medium (permanent data loss by design, so the safeguards matter) · **Type:** Data integrity / product rule
+**Found:** 2026-10-25. After DEC-128 / RISK-133 a superadmin got a refusal for every patient that had a booking, which made test patients impossible to remove. The owner decided that a permanent delete must remove the patient with everything that belongs to them.
+
+**Cause of the old behaviour:** on production every table pointing at `customers` is `ON DELETE SET NULL` (`reservations`, `transactions`, `invoices`, `product_sales`) or `ON DELETE CASCADE` (`customer_packages`, `customer_product_balances`, `laser_pulse_logs`, `medical_records`, `medical_reports`, `prescriptions`, `wallet_txns`; checked with a SELECT on `pg_constraint`, none of the foreign keys to `customers`, `reservations`, `invoices` or `transactions` restricts a delete). A plain delete of the row un-linked the bookings, and the Patients list rebuilds a patient from any booking with no patient row (`res-cust-<phone>`).
+
+**Fix:** DEC-132 (supersedes DEC-128). Bookings, payments and the other records are deleted explicitly before the patient row; un-linked bookings with the patient's phone and name go too; the delete is retryable if a step fails; the dialog shows the counts first.
+
+**Risks that remain, by design:**
+- No undo. A mis-clicked permanent delete loses the bookings, payments and medical records of that patient. Mitigation: only a superadmin, the counts are shown first and a second confirm is required. Soft Delete is still the way to hide a patient and keep the history.
+- Finance figures that sum payments change after a delete (the patient's income is gone). Inventory is not restored.
+- The delete is a sequence of requests, not one transaction: a failure part-way leaves a patient with part of the data removed (and a 500 naming the step); running the delete again finishes it.
+- Un-linked bookings with the patient's phone but a clearly different name are kept, so such a patient can still show up as a separate entry; the dialog says how many.
+- This also deletes real patients' history if a superadmin picks the wrong one: the dialog lists what is removed, but staff must read it.

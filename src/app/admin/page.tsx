@@ -24,6 +24,7 @@ import { translations } from "@/lib/translations";
 import { CLIENT } from "@/config/client";
 import { getRoleSlug, getRoleDisplayName, isPortalRoleMatch, normalizeWorkspace, type RoleWorkspace } from "@/lib/roleUtils";
 import { adminTranslations } from "@/components/admin/translations";
+import { describeDeletionCounts, type PatientDeletionCounts } from "@/lib/customerDeletionText";
 import UserProfileView, { UserProfileViewTranslations } from "@/components/admin/UserProfileView";
 import ClinicProfileSettingsView from "@/components/admin/settings/ClinicProfileSettingsView";
 import MedicalRecordsSettingsView from "@/components/admin/settings/MedicalRecordsSettingsView";
@@ -858,7 +859,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   // DEC-113: the doctor screens are chosen by the role's workspace setting, never by guessing from
   // the person's name, department or role name. An admin/superadmin can also open them on purpose.
   // Declared here (not next to the early return that uses it) so the booking poll can stand down
-  // while the doctor screens are shown: they load their own reservations (DEC-130).
+  // while the doctor screens are shown: they load their own reservations (DEC-132).
   const showDoctorWorkspace = adminWorkspace === "doctor" || (canSwitchWorkspace && viewAsDoctor);
   const [adminPermissions, setAdminPermissions] = useState<string[]>([]);
   const hasPermission = useCallback((permKey: string): boolean => {
@@ -1247,6 +1248,14 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   const [selectedCustomerForEdit, setSelectedCustomerForEdit] = useState<Customer | null>(null);
   const [deleteCustomerTarget, setDeleteCustomerTarget] = useState<Customer | null>(null);
   const [deletingCustomer, setDeletingCustomer] = useState(false);
+  // DEC-132: what a permanent delete would remove, shown before the superadmin confirms.
+  const [deletePreview, setDeletePreview] = useState<
+    | { state: "loading" }
+    | { state: "error"; message: string }
+    | { state: "ready"; counts: PatientDeletionCounts; keptBookingsOtherName: number }
+    | null
+  >(null);
+  const [hardDeleteArmed, setHardDeleteArmed] = useState(false);
 
   // Checkout & Payment states
   const [checkoutBooking, setCheckoutBooking] = useState<any>(null);
@@ -2278,7 +2287,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
   async function fetchRolesAndEmployees() {
     // Only the owner and admins may read these lists (the server answers 403 to everyone else), so
-    // other roles do not ask at all (RISK-136). The role comes from the ref: this is also called in
+    // other roles do not ask at all (RISK-138). The role comes from the ref: this is also called in
     // the same tick that learns the role, before state has caught up.
     if (!session?.access_token || !canLoadAdminDirectory(adminRoleRef.current)) return;
     if (employeesList.length === 0) setLoadingRolesAndEmployees(true);
@@ -2581,7 +2590,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     const intervalMs = isTestMode ? 5000 : 30000;
 
     // First load now, then every interval while the tab is visible; never overlapping, paused in a
-    // hidden tab and refreshed when it is shown again (RISK-136).
+    // hidden tab and refreshed when it is shown again (RISK-138).
     return startVisiblePoll(fetchHrAlerts, intervalMs, { immediate: true });
   }, [session, adminRole]);
 
@@ -4245,7 +4254,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
   // Re-fetch bookings whenever branch selection changes and poll every 15 seconds for new requests.
   // The poll runs only while the tab is visible (a hidden tab is refreshed once when shown again) and
-  // not at all while the doctor screens are displayed, which load their own reservations (DEC-130).
+  // not at all while the doctor screens are displayed, which load their own reservations (DEC-132).
   useEffect(() => {
     if (!branch) return; // wait until branches are loaded
     if (showDoctorWorkspace) return;
@@ -5571,6 +5580,34 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     setImportProgress(0);
     setImportLog([]);
   };
+
+  useEffect(() => {
+    setHardDeleteArmed(false);
+    if (!deleteCustomerTarget?.id || adminRole !== "superadmin") {
+      setDeletePreview(null);
+      return;
+    }
+    let cancelled = false;
+    setDeletePreview({ state: "loading" });
+    fetch(`/api/customers?id=${encodeURIComponent(deleteCustomerTarget.id)}&deletePreview=1`, {
+      headers: { Authorization: `Bearer ${session?.access_token || ""}` },
+    })
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Could not check what will be deleted");
+        return data;
+      })
+      .then((data) => {
+        if (!cancelled) setDeletePreview({ state: "ready", counts: data.counts, keptBookingsOtherName: data.keptBookingsOtherName || 0 });
+      })
+      .catch((err) => {
+        if (!cancelled) setDeletePreview({ state: "error", message: err.message || "Could not check what will be deleted" });
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deleteCustomerTarget?.id, adminRole]);
 
   function handleDeleteCustomer(id: string, mode: 'soft' | 'hard' = 'hard') {
     setDeletingCustomer(true);
@@ -9618,8 +9655,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
                   <button
                     type="button"
-                    disabled={deletingCustomer}
-                    onClick={() => handleDeleteCustomer(deleteCustomerTarget.id!, 'hard')}
+                    disabled={deletingCustomer || hardDeleteArmed || deletePreview?.state !== "ready"}
+                    onClick={() => setHardDeleteArmed(true)}
                     className="flex items-start gap-3 p-3 rounded-xl border border-rose-300 bg-rose-50/60 hover:bg-rose-50 text-start transition cursor-pointer disabled:opacity-50"
                   >
                     <div className="h-8 w-8 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center shrink-0 mt-0.5">
@@ -9631,15 +9668,61 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                         <span className="text-[9px] font-bold uppercase bg-rose-200/70 text-rose-900 px-2 py-0.5 rounded-full">Irreversible</span>
                       </div>
                       <p className="text-[11px] text-rose-900/80 mt-0.5">
-                        Permanently removes this profile. Only allowed for a patient with no bookings, payments, packages, wallet or medical history; otherwise it tells you what blocks it. Use Soft Delete to keep the history.
+                        {lang === "ar"
+                          ? "يحذف الملف نهائياً مع كل ما يخص المريض: الحجوزات والمدفوعات والباقات والمحفظة والسجلات الطبية. لا يمكن التراجع. للاحتفاظ بالسجل استخدم الحذف المؤقت."
+                          : "Permanently deletes this profile together with everything that belongs to the patient: bookings, payments, packages, wallet and medical records. It cannot be undone. Use Soft Delete to keep the history."}
                       </p>
                     </div>
                   </button>
+
+                  {deletePreview?.state === "loading" && (
+                    <p className="text-[11px] text-[var(--color-brand-secondary)]">
+                      {lang === "ar" ? "جاري حساب ما سيتم حذفه..." : "Checking what would be deleted..."}
+                    </p>
+                  )}
+                  {deletePreview?.state === "error" && (
+                    <p className="text-[11px] font-semibold text-rose-700">
+                      {lang === "ar"
+                        ? "تعذر حساب ما سيتم حذفه، لذلك الحذف النهائي غير متاح الآن: "
+                        : "Could not check what would be deleted, so permanent delete is unavailable right now: "}
+                      {deletePreview.message}
+                    </p>
+                  )}
+                  {hardDeleteArmed && deletePreview?.state === "ready" && (
+                    <div className="rounded-xl border border-rose-400 bg-rose-50 p-3 space-y-2">
+                      <p className="text-xs font-bold text-rose-950">
+                        {lang === "ar" ? "سيتم حذف ما يلي نهائياً:" : "This will permanently delete:"}
+                      </p>
+                      <p className="text-xs text-rose-900 leading-relaxed">
+                        {describeDeletionCounts(deletePreview.counts, lang === "ar" ? "ar" : "en") ||
+                          (lang === "ar"
+                            ? "لا توجد حجوزات أو مدفوعات أو سجلات أخرى لهذا المريض."
+                            : "No bookings, payments or other records are attached to this patient.")}
+                      </p>
+                      {deletePreview.keptBookingsOtherName > 0 && (
+                        <p className="text-[11px] text-rose-900/80">
+                          {lang === "ar"
+                            ? `${deletePreview.keptBookingsOtherName} حجز غير مرتبط بنفس رقم الهاتف لكن باسم مختلف لن يُحذف، وقد يظهر كمريض منفصل.`
+                            : `${deletePreview.keptBookingsOtherName} un-linked booking(s) with the same phone but a different name will not be deleted and may still show as a separate patient.`}
+                        </p>
+                      )}
+                      <button
+                        type="button"
+                        disabled={deletingCustomer}
+                        onClick={() => handleDeleteCustomer(deleteCustomerTarget.id!, "hard")}
+                        className="rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {deletingCustomer
+                          ? (lang === "ar" ? "جاري الحذف..." : "Deleting...")
+                          : (lang === "ar" ? "نعم، احذف كل شيء نهائياً" : "Yes, permanently delete everything")}
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
               <p className="text-xs text-[var(--color-brand-secondary)] mb-5 leading-relaxed">
-                This action will permanently delete the customer profile. It is refused if the patient has bookings, payments, packages, wallet or medical history.
+                This action permanently deletes the customer profile together with all of the patient's bookings, payments, packages, wallet and medical records. Only a Super Admin can do this.
               </p>
             )}
 
