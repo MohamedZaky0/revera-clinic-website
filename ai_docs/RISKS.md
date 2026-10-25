@@ -1266,6 +1266,7 @@ filled in with the above.
 - [RISK-127](#risk-127) — The Doctor Portal Briefly Showed Every Doctor's Patients On First Load (RESOLVED, NOT YET CONFIRMED ON PRODUCTION)
 - [RISK-128](#risk-128) — The Public Browser Key Could Read Staff Accounts, Salaries, Attendance, Prescriptions And More — And Write Or Delete Accounts And Roles (RESOLVED ON DEV AND PRODUCTION; PRODUCTION SCREENS NOT YET RE-CHECKED BY THE OWNER)
 - [RISK-129](#risk-129) — Patients Who Paid Showed "Total Spend 0" (RESOLVED, NOT YET CONFIRMED ON PRODUCTION)
+- [RISK-133](#risk-133) — "Hard Delete" Of A Patient Looked Like It Did Nothing: The Patient Came Back From Its Bookings (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
 
 ## RISK-003: Patient Auth Is Non-Functional
 
@@ -5645,3 +5646,23 @@ See `PROPOSALS.md` for:
 **Fix (DEC-127):** the raw writer is gone; one hook writes the derived numbers and stops once the profile matches. Regression tests: `tests/components/patients/OpenProfileFinancialSync.test.tsx` (settles on 2700/2920, reproduces the alternation with a second writer) and `tests/lib/profileFinancialWriters.test.ts` (page has a single writer).
 
 **Still true:** the number shown is the larger of the stored value and the bookings' value (DEC-121). If a stored figure is too high or too low, it is corrected through "Adjust financials" or by fixing the bookings, not by this fix.
+
+## RISK-133: "Hard Delete" Of A Patient Looked Like It Did Nothing: The Patient Came Back From Its Bookings (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
+
+**Manual test checklist:** `ai_docs/manual_tests/PATIENT_HARD_DELETE_MANUAL_TESTS.md`
+
+**Severity:** Medium (a superadmin could not remove a patient; no data was lost) · **Type:** Data integrity / UX
+**Found:** 2026-10-25, reported by the owner on production: Patients, Hard Delete on the test patient "Hamada Test"; after confirming, the patient was back after the list refreshed.
+
+**Cause (read from code and from production, SELECT only):**
+- The route is authenticated and uses the service role (`DELETE /api/customers`, `requireSuperadminAccess`), so it was not blocked by row-level security (RISK-128 is not involved) and the foreign keys do not block either: on production every table that points at `customers` is `ON DELETE SET NULL` (`reservations`, `transactions`, `invoices`, `product_sales`) or `ON DELETE CASCADE` (`customer_packages`, `customer_product_balances`, `laser_pulse_logs`, `medical_records`, `medical_reports`, `prescriptions`, `wallet_txns`). The old route set `reservations.customer_id` to NULL and deleted the `customers` row, which succeeded.
+- The admin Patients list is `customers` (database) plus one made-up entry per booking that has no matching patient row (`src/app/admin/page.tsx`, "Synthesize entries for any patients in allReservations", id `res-cust-<phone>`). The booking keeps the patient's name and phone, so the patient reappeared as a booking-derived entry on the next refresh.
+- Production state for the test patient at the time of the check: no `customers` row named like "Hamada Test"; 1 booking with that name (status `rejected`) whose `customer_id` is NULL, and that is the **only** unlinked booking among all production bookings; 1 transaction points at that booking; no packages, wallet entries, invoices, product sales, medical records, prescriptions or login. In other words the first hard delete had worked and the booking was what kept the patient on screen.
+- A second Hard Delete on the booking-derived entry sent `res-cust-<phone>` as a UUID to Postgres (22P02 "invalid input syntax for type uuid"), shown as a raw database error, or did nothing.
+- Also found: the route deleted the patient's login before the patient row (a failed row delete had already removed it), reported success when the patient did not exist, and never checked that a row was really removed.
+
+**Fix:** DEC-128. A permanent delete is refused with a clear 409 naming what blocks it (bookings, payment records, packages, wallet, medical history), booking-derived entries get an explanation instead of a database error, the row delete is checked for a real removal, and the login is removed only after the row.
+
+**To clear the existing "Hamada Test" entry on production:** nothing in this change deletes data. Delete (or cancel) its one booking from the Bookings screen as superadmin and the entry disappears. That booking has 1 transaction linked to it (the transaction stays, with no booking), which is for the owner to accept.
+
+**Open (owner decision):** whether a permanent delete should be able to remove a patient together with their bookings and payments (for test data). Not built: it would erase income and visit history with no way back. Options: (a) keep as is, test data is cleaned by deleting its bookings first; (b) a separate superadmin-only "delete test patient and everything" action that lists what will be erased and asks to type the patient's name.

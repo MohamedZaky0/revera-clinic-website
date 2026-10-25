@@ -9648,7 +9648,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                         <span className="text-[9px] font-bold uppercase bg-rose-200/70 text-rose-900 px-2 py-0.5 rounded-full">Irreversible</span>
                       </div>
                       <p className="text-[11px] text-rose-900/80 mt-0.5">
-                        Permanently removes this profile from the database. Linked appointments are unlinked.
+                        Permanently removes this profile. Only allowed for a patient with no bookings, payments, packages, wallet or medical history; otherwise it tells you what blocks it. Use Soft Delete to keep the history.
                       </p>
                     </div>
                   </button>
@@ -9656,7 +9656,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
               </div>
             ) : (
               <p className="text-xs text-[var(--color-brand-secondary)] mb-5 leading-relaxed">
-                This action will permanently delete the customer profile. Linked reservations will be set to guest status.
+                This action will permanently delete the customer profile. It is refused if the patient has bookings, payments, packages, wallet or medical history.
               </p>
             )}
 

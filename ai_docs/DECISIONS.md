@@ -3952,3 +3952,21 @@ into this app for the production environment.
 **Rule for future work:** do not add another code path that writes `spent_amount` / `spent` / `outstanding` / `wallet_balance` of `viewingCustomerProfile` from a different source. `tests/lib/profileFinancialWriters.test.ts` fails if the raw writer returns.
 
 **Limits:** after a manual "Adjust financials" the drawer shows the typed values only until the next sync; the sync then shows the derived value of the refreshed list (which is the same number once the save has been read back). Not changed here.
+
+## DEC-128: Permanent Delete Of A Patient Is Refused While Bookings, Payments Or Other History Hang Off It; The Reason Is Named
+
+**Date:** 2026-10-25 · **Status:** Done on dev (branch `fix/patient-hard-delete`); not yet on production · **Related:** RISK-133, DEC-074 (reservation-derived patients), PRODUCT_RULES "Deletion Rules"
+
+**Decision:** `DELETE /api/customers?id=X&mode=hard` (superadmin only, unchanged) now:
+1. answers `404` if the patient row does not exist (it used to answer "deleted successfully" for nothing);
+2. counts what hangs off the patient (`src/lib/customerDeletion.ts`): bookings (`reservations`), payment records (`transactions` + `invoices` + `product_sales`), packages (`customer_packages`), wallet entries (`wallet_txns`), product balances (`customer_product_balances`), laser sessions (`laser_pulse_logs`) and clinical records (`medical_records` + `medical_reports` + `prescriptions`). If any is non-zero it answers `409` with `code: PATIENT_HAS_HISTORY`, a `blockers` object with the counts, and a plain sentence ("they have 2 bookings and 3 payment records ... use Soft Delete"). Nothing is changed;
+3. otherwise deletes the row with `.select('id')` and answers `500` ("removed no rows") if no row was really removed, so a blocked write can never again be reported as success;
+4. removes the patient's login (Auth user) only after the row is gone (before, a failed row delete had already cost the patient their login). It uses `customers.auth_user_id` when set, falls back to the old phone/e-mail match otherwise, and never removes a login that belongs to an `employee_accounts` row.
+
+A patient that exists only in the list because of bookings (`res-cust-<phone>`, DEC-074) has no `customers` row. For those, hard and soft delete answer `409` with `code: PATIENT_IS_BOOKING_DERIVED` and the number of bookings: "delete or cancel those bookings from the Bookings screen and the entry disappears" (`404` if no booking is left, `400` if the id has no usable phone). Soft delete of a real patient now answers `404` instead of an obscure `500` when the row is missing. The two descriptions in the Delete Customer dialog (`src/app/admin/page.tsx`) no longer promise that "linked appointments are unlinked".
+
+**Why:** RISK-133. Every table pointing at `customers` is `ON DELETE SET NULL` (reservations, transactions, invoices, product_sales) or `ON DELETE CASCADE` (everything else), so Postgres never refuses. The old route therefore un-linked the bookings and deleted the row; the Patients list then rebuilt the same patient from those bookings' name and phone, so "Hard Delete" looked like it did nothing. On the clinic side, a payment or visit can no longer lose its patient link by accident, and the person deleting is told what is in the way.
+
+**Not changed on purpose (business decision, see RISK-133):** the rule is the safe one. A permanent delete that also removes the patient's bookings and payments (what the old dialog text implied) would erase income and visit records, so it was not built. Soft Delete (Deactivate) remains the way to hide a patient who has history. No migration: the foreign keys are left as they are.
+
+**Tests:** `tests/routes/customers-hard-delete.test.ts` (15 cases, 11 of which failed before the change). Manual checklist: `ai_docs/manual_tests/PATIENT_HARD_DELETE_MANUAL_TESTS.md`.
