@@ -12,6 +12,7 @@ import { recordWalletMovement } from '@/lib/wallet';
 import { recordTransaction } from '@/lib/transactionLedger';
 import { classifyCaller } from '@/app/api/customers/route';
 import { resolveLaserPulseRate } from '@/lib/laserRate';
+import { hardDeleteBooking } from '@/lib/bookingHardDelete';
 
 /**
  * pg returns DATE columns as JavaScript Date objects set to UTC midnight.
@@ -2265,17 +2266,11 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ success: true, message: 'Reservation cancelled (soft delete)', data: updated });
     }
 
-    const { data: deleted, error: deleteError } = await supabaseServer
-      .from('reservations')
-      .delete()
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (deleteError || !deleted) {
-      return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    }
-    return NextResponse.json({ success: true, message: 'Reservation permanently deleted' });
+    // DEC-133: a permanent delete takes the booking's own payments, ledger invoice and share of the
+    // patient's stored figures with it (src/lib/bookingHardDelete.ts). `id=all` above is NOT cascaded.
+    const employee = (access.access as any).employee;
+    const outcome = await hardDeleteBooking(id, { id: employee?.id ?? null, email: employee?.email ?? null });
+    return NextResponse.json(outcome.body, { status: outcome.status });
   } catch (err) {
     console.error('DELETE /api/reservations error:', err);
     return NextResponse.json({ error: 'Database error' }, { status: 500 });

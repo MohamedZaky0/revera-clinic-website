@@ -11,6 +11,8 @@ type DeleteConfirmOptions = {
   itemName?: string;
   itemType?: string;
   isSuperAdmin?: boolean;
+  /** Replaces the generic text under "Hard Delete" (for deletes that remove more than the one record). */
+  hardDeleteNote?: string;
 };
 
 type AlertConfirmContextType = {
@@ -38,6 +40,7 @@ export function AlertConfirmProvider({ children }: { children: React.ReactNode }
     itemName?: string;
     itemType?: string;
     isSuperAdmin?: boolean;
+    hardDeleteNote?: string;
     resolve: ((value: any) => void) | null;
   }>({
     open: false,
@@ -80,6 +83,7 @@ export function AlertConfirmProvider({ children }: { children: React.ReactNode }
         itemName: opts.itemName,
         itemType: opts.itemType,
         isSuperAdmin: opts.isSuperAdmin ?? true,
+        hardDeleteNote: opts.hardDeleteNote,
         resolve,
       });
     });
@@ -231,7 +235,7 @@ export function AlertConfirmProvider({ children }: { children: React.ReactNode }
                         <span className="text-[10px] font-bold uppercase tracking-wider bg-rose-200/70 text-rose-900 px-2 py-0.5 rounded-full">Irreversible</span>
                       </div>
                       <p className="text-[11px] text-rose-900/80 mt-1 leading-relaxed">
-                        Permanently deletes this record directly from the database. Linked records will be cleaned or unlinked.
+                        {modal.hardDeleteNote || "Permanently deletes this record directly from the database. Linked records will be cleaned or unlinked."}
                       </p>
                     </div>
                   </button>

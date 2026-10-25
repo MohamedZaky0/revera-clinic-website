@@ -1272,6 +1272,7 @@ filled in with the above.
 - [RISK-136](#risk-136) — Admin Tabs Polled The Server Around The Clock, Hidden Or Not, And Staff Without Admin Rights Asked For Admin-Only Lists On Every Click (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
 - [RISK-137](#risk-137) — Every Public Page View Cost About 12 API Calls And 15 Database Queries, Nothing Was Cached, And The Booking Popup Loaded Six Reads On Pages That Never Show It (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
 - [RISK-138](#risk-138) — A Patient With Bookings Could Not Be Deleted For Good; The Owner's Rule Is That Permanent Delete Removes Everything (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
+- [RISK-139](#risk-139) — Permanently Deleting A Booking Left Its Payments And Money In The Patient's Figures (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
 
 ## RISK-003: Patient Auth Is Non-Functional
 
@@ -5816,3 +5817,24 @@ See `PROPOSALS.md` for:
 - The delete is a sequence of requests, not one transaction: a failure part-way leaves a patient with part of the data removed (and a 500 naming the step); running the delete again finishes it.
 - Un-linked bookings with the patient's phone but a clearly different name are kept, so such a patient can still show up as a separate entry; the dialog says how many.
 - This also deletes real patients' history if a superadmin picks the wrong one: the dialog lists what is removed, but staff must read it.
+
+**Open (owner decision):** whether a permanent delete should be able to remove a patient together with their bookings and payments (for test data). Not built: it would erase income and visit history with no way back. Options: (a) keep as is, test data is cleaned by deleting its bookings first; (b) a separate superadmin-only "delete test patient and everything" action that lists what will be erased and asks to type the patient's name.
+
+## RISK-137: Permanently Deleting A Booking Left Its Payments And Money In The Patient's Figures (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
+
+**Manual test checklist:** `ai_docs/manual_tests/BOOKING_HARD_DELETE_CASCADE_MANUAL_TESTS.md`
+
+**Severity:** High (wrong money on a patient, no data lost) · **Type:** Data integrity
+**Found:** 2026-10-25, reported by the owner (superadmin) on production for the patient "hazem al hadary" (`e428fecd-3aa9-4a2f-86e3-31f21edc0350`): after hard-deleting the patient's bookings from the Bookings screen, Total Spend 2,700, Outstanding 2,920 and "Bookings 3" were still shown.
+
+**Cause (code and production SELECTs only):** the route ran `delete from reservations where id = ...`. `transactions.reservation_id` and `invoices.reservation_id` are `ON DELETE SET NULL`, so the payments (TXN-001073 amount 1200, TXN-001074 amount 1500) and the booking invoices (3 invoices, 2 payments) stayed as orphans. `customers.spent_amount` / `outstanding` / `number_of_bookings` are running totals moved by deltas in several routes and nothing moved them back. The Patients list falls back to the stored count when a patient has no bookings left, and shows the larger of the stored and the booking-derived money (DEC-121), so the stored leftovers were what stayed on screen. The orphan invoices also keep counting in finance reports (receivables aging reads issued invoices by patient), and Settle Debt would still offer to settle them.
+
+**Fix:** DEC-131 (no migration).
+
+**Left over on production for this patient (nothing was changed by this fix, the owner decides):** 0 bookings; customers row `spent_amount` 2700, `outstanding` 2920, `number_of_bookings` 3; 2 transactions with no booking (TXN-001073, TXN-001074); 3 invoices with no booking (INV-000083 1200, INV-000084 1600, INV-000121 2820) with 2 payments (1200, 1500); 3 wallet entries (5520 in, 100 out, 5420 out; wallet balance 0); 3 active customer packages. The new delete would have taken these out with each booking; for the ones already deleted they have to be cleaned by hand (or a one-off script the owner approves).
+
+**Still open (follow-ups, not guessed):**
+1. Pulse (laser) package usage and package usage entered on previous (historical) bookings are not given back when the booking is deleted (no receipt row ties them to the booking). Only sessions consumed through `consume_customer_package_session` are.
+2. The wallet is not reversed (the booking row does not hold what wallet credit it used).
+3. The delete is an ordered sequence with undo, not one database transaction. A stalled write (RISK-131) can in theory leave an undo undone; the answer says so (`partial`). A Postgres function would make it atomic.
+4. `product_sales` rows of a previous booking's products are not linked to the booking and stay.

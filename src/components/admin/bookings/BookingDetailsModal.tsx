@@ -43,6 +43,7 @@ import {
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAlertConfirm } from "@/contexts/AlertConfirmContext";
+import { bookingHardDeleteWarning } from "@/lib/bookingDeletion";
 import { supabase } from "@/lib/supabaseClient";
 import { ServiceItem, getEffectiveServicePrice } from "@/lib/services";
 import { printInvoice, printPrescription } from "@/lib/printUtils";
@@ -555,6 +556,11 @@ function BookingDetailsModal({
       itemName: patientLabel,
       itemType: isRTL ? "حجز" : "booking",
       isSuperAdmin: true,
+      // DEC-133: a permanent delete also removes the booking's payments and invoice and lowers the patient's figures.
+      hardDeleteNote: bookingHardDeleteWarning(
+        isRTL,
+        Number((booking as any)?.amountPaid ?? (booking as any)?.amount_paid ?? 0)
+      ),
     });
     if (!deleteChoice) return;
 
@@ -565,9 +571,13 @@ function BookingDetailsModal({
         headers: authenticatedJsonHeaders,
       });
       if (res.ok) {
+        const data = await res.json().catch(() => ({}));
         onClose();
         fetchRequests();
         fetchAllReservations();
+        // The patient's Total Spend / Outstanding / bookings count were lowered on the server.
+        if (mode === "hard") fetchCustomers();
+        if (Array.isArray(data?.warnings) && data.warnings.length > 0) alert(data.warnings.join(" "));
       } else {
         const data = await res.json().catch(() => ({}));
         alert(data.error || (isRTL ? "فشل حذف الحجز." : "Failed to delete booking."));

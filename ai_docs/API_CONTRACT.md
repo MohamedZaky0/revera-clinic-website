@@ -399,9 +399,9 @@ public booking payment-declaration flow; every other PATCH shape requires staff 
 
 ## DELETE /api/reservations?id={id}
 
-Deletes a reservation. Pass `id=all` to delete all reservations.
+Superadmin only. `mode=soft` cancels the booking and changes nothing else. `mode=hard` (the default) permanently deletes ONE booking and, in the same call (DEC-133), the booking's payment rows (`transactions`, except wallet-type rows), its ledger invoice(s) with their payments and lines, gives back package sessions it consumed through `consume_customer_package_session`, and takes the booking's share out of the patient's `spent_amount` / `outstanding` / `number_of_bookings` (never below 0). Wallet is not touched. Pass `id=all` to delete all reservations (no cascade: payments and patient figures are not touched).
 
-**Response:** `{ success: true, message: "..." }`
+**Response (hard, one booking):** `{ success: true, message, removed: { transactions: [{ id, transactionId, type, amount }], transactionsTotal, walletTransactionsKept, invoices: [{ id, invoiceNo }], payments, packageSessionsRestored }, customer: { id, before: {spent, outstanding, bookings}, after: {...} } | null, warnings?: string[] }`. Errors: `404` booking not found; `409` `PATIENT_FIGURES_CHANGED` (the patient's figures changed while deleting, nothing changed, retry); `500` a step failed (earlier steps are undone, `partial: true` + `undoFailures` if an undo failed). Other modes: `{ success: true, message: "..." }`.
 
 ---
 

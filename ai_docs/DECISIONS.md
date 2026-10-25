@@ -4049,3 +4049,32 @@ A patient that exists only in the list because of bookings (`res-cust-<phone>`, 
 **Limits / consequences (accepted):** income recorded for this patient disappears from finance reports; inventory is not put back for the product sales and consumables of the deleted bookings; there is no undo. Un-linked product sales that only carry the patient's phone are not found. Other staff screens that already hold the patient in memory refresh on their next poll.
 
 **Tests:** `tests/routes/customers-hard-delete.test.ts` (everything is deleted, another patient and another booking's payment untouched, staff login guard, 404, failing step reported, derived entry disappears, preview counts), `tests/lib/customerDeletionText.test.ts`. Manual checklist: `ai_docs/manual_tests/PATIENT_HARD_DELETE_EVERYTHING_MANUAL_TESTS.md`.
+
+---
+
+## DEC-131: Permanently Deleting A Booking Also Deletes Its Payments And Invoice And Takes Its Share Out Of The Patient's Figures
+
+**Date:** 2026-10-25 · **Status:** Done on dev (branch `fix/booking-hard-delete-cascade`); not yet on production; **no migration** · **Related:** RISK-137, DEC-121, DEC-127, DEC-128
+
+**Decision:** `DELETE /api/reservations?id=<id>&mode=hard` (superadmin only, unchanged) now calls `hardDeleteBooking` (`src/lib/bookingHardDelete.ts`). In order, with an undo for each step that can be undone:
+1. reads the booking, its patient, its ledger invoice(s) and their payments, its `transactions` rows and the package sessions it consumed. A failed read changes nothing;
+2. **patient figures** (`customers.spent_amount`, `outstanding`, `number_of_bookings`): written back with the booking's share removed, guarded so it only writes if the three values are still what was read (otherwise `409 PATIENT_FIGURES_CHANGED`, nothing changed);
+3. **package sessions**: for each `package_revenue_recognitions` row of this booking with reason `session` and a package item (the receipt of `consume_customer_package_session`), `qty_used` -1 and `qty_remaining` +1 on that item (guarded); a `fully_used` package that is not expired goes back to `active`;
+4. **payments**: deletes the booking's `transactions` rows (`reservation_id` = the booking, or `invoice_id` = the booking's own invoice), except `wallet_topup` / `wallet_deduction` rows;
+5. **the booking** (the commit point). Its `reservation_products`, `consumption_entries` and `package_revenue_recognitions` go with it by foreign key, as before;
+6. **the booking's ledger invoice(s)** (`invoices.reservation_id` = the booking); their `payments` and `invoice_lines` cascade.
+
+A failure in steps 2 to 5 undoes the earlier steps (figures restored, sessions taken back, payments re-inserted with their original ids) and answers `500` "the booking was not deleted and nothing was changed". If an undo itself fails the answer says so (`partial: true`, `undoFailures`) and it is logged with `console.error`. A failure in step 6 happens after the booking is gone, so the delete still answers `200` with a `warnings` entry naming the invoice that is left. The response carries `removed` (transaction ids/types/amounts, their total, invoice numbers, payment count, wallet transactions kept, package sessions given back) and `customer` (figures before/after); one `console.info` line `[audit] booking hard delete ...` records the same. `id=all` and soft delete are unchanged (`id=all` does not cascade).
+
+**The patient-figure rules** (`src/lib/bookingDeletion.ts`; derived from the code that writes them, not from recomputing): the booking's share is read from its own row. `spent` loses `amount_paid` if the booking is `completed` or `no_show` (the two statuses at which the total was increased), `outstanding` loses `amount_left` if it is `completed`, `number_of_bookings` loses 1 for any status. A confirmed/approved/started booking with a deposit never reached the stored totals, so it gives back no money. Every figure is floored at 0 (a warning says so). Nothing is recomputed from the other bookings, because the same totals also hold product sales, package sales, manual adjustments and wallet effects that no booking knows about. Settle Debt and later payments change the booking's `amount_paid`/`amount_left` together with the totals, and editing a previous booking re-settles the totals by the change, so the booking row is the right source.
+
+**UI:** the Hard Delete choice of the booking dialog now says (English and Arabic) that the booking's payments and invoice are deleted too, shows the amount paid on the booking when the screen has it, and that the patient's Total Spend, Outstanding and bookings count go down by the booking's share (`bookingHardDeleteWarning`, `hardDeleteNote` option of `showDeleteConfirm`). After a hard delete the patients list is refreshed.
+
+**Not done on purpose:**
+- **Wallet** is not reversed. A previous booking that was underpaid may have used wallet credit first, an overpayment may have settled other debt or credited the wallet; the amounts are not stored on the booking. Wallet-type `transactions` rows are kept for the same reason (they describe the wallet, which did not move back).
+- **Pulse (laser) package usage** (`package_pulse_usage`, `customer_packages.pulses_used`) and package usage of **previous (historical) bookings** are not given back: they are not tied to a `package_revenue_recognitions` receipt, so a reversal would be a guess. Follow-up, RISK-137.
+- `product_sales` rows (no link to the booking in the schema), `medical_records`, `prescriptions`, `laser_pulse_logs` stay and just lose the link, as before. `wallet_txns` stay.
+- Not atomic: Supabase's API has no multi-statement transaction, so the sequence above is the substitute. A Postgres function would make it atomic, but it could not be run or tested here without writing to a database.
+- A manual transaction that was created through the API with a `reservation_id` also moved the totals itself; the screens never send that field, so it is not reversed separately.
+
+**Tests:** `tests/routes/reservations-hard-delete-cascade.test.ts` (23 cases, 18 of which failed before the change), `tests/lib/bookingDeletion.test.ts`. Manual checklist: `ai_docs/manual_tests/BOOKING_HARD_DELETE_CASCADE_MANUAL_TESTS.md`.
