@@ -3930,3 +3930,13 @@ into this app for the production environment.
 **Why:** RISK-130. A clock about an hour ahead made every token look expired, so refreshes (and everything that triggered them) arrived several per second until Supabase answered 429. The warning is the real remedy, because only the person at that computer can fix its clock; 2 and 3 only soften the damage.
 
 **Limits:** several screens still call `supabase.auth.getSession()` directly instead of `getAuthHeaders()`; they were not changed. A computer whose clock is wrong still refreshes about every 30 seconds through Supabase's own timer, which is well under the limit.
+
+## DEC-126: Server Reads To Supabase Are Cut After 8 Seconds And Asked Again; Writes Are Never Repeated
+
+**Date:** 2026-10-25 · **Status:** Done on dev; not yet on production · **Related:** RISK-131
+
+**Decision:** `supabaseServer` (`src/lib/supabaseServer.ts`) uses `createStallGuardFetch()` (`src/lib/stallGuardFetch.ts`): a GET or HEAD that has not answered within 8 s is aborted and sent again, up to 2 more times, also after a dropped connection (`TypeError`). POST, PATCH, PUT and DELETE are passed through untouched and never repeated, because a stalled write may already have been applied and a second one would duplicate it. A cancellation by the caller is respected. In the admin page, the `/api/auth/me` check carries a 10 s timeout, so a stalled answer becomes the existing network-failure retry (1 s, 3 s) instead of a minute of "Verifying administrator session...".
+
+**Why:** RISK-131. Most requests take 0.2 s and a few stall for 20-45 s or until the platform kills the function at 25 s; a repeat nearly always succeeds at once. A read is the same read twice, so repeating it is safe.
+
+**Cost / limits:** a read that legitimately needs more than 8 s to start answering now fails after about 24 s instead of succeeding (no such read is known; reports and lists answer in well under a second). Writes can still stall; the person sees an error and retries. This hides the symptom, it does not find the cause.

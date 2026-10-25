@@ -5556,3 +5556,18 @@ See `PROPOSALS.md` for:
 **Fix:** (1) clock synchronised on that laptop; staff told not to set the time by hand; the taskbar shows an hour less than Cairo's real time until Egypt leaves summer time on 29 Oct 2026 (cosmetic: the browser knows the rule and the app shows the right time). (2) DEC-125: the admin shows a warning when a computer's clock differs from the server's by 5 minutes or more, and a burst of token refreshes no longer causes a burst of API calls.
 
 **Still true:** any computer with a clock this far out will hit this until its clock is fixed; DEC-125 only makes it visible and softer, it cannot correct the clock.
+
+## RISK-131: Production API Calls To Supabase Stall At Random, So Login And Screens Hang Or Fail (MITIGATED ON DEV; ROOT CAUSE NOT FOUND)
+
+**Manual test checklist:** `ai_docs/manual_tests/SUPABASE_STALL_GUARD_MANUAL_TESTS.md`
+
+**Severity:** High (staff could not sign in; "Verifying administrator session..." for a minute or more) · **Type:** Availability
+**Found:** 2026-10-25, by the owner: Suppliers "Failed to fetch", "Error saving product", login stuck on "Signing in & Routing..." and then "Verifying administrator session...". Vercel logs showed `/api/employees` and `/api/roles` killed after 25 s ("did not return an initial response within 25s").
+
+**What was measured:** `/api/auth/me` with a fake token (it needs only Supabase's `getUser`) answered in 0.2 s most times, but 12 repeats gave 2.1 s, 19.8 s and 44.9 s once each; routes that never call Supabase (`/login`) were always about 0.1 s. Supabase read directly from another computer answered in 0.07-0.2 s every time. The database itself was healthy (20 MB, no blocking or long queries, 1.00 index hit rate); both Supabase and Vercel status pages said all systems operational; the function region (Dublin) matches the database region (eu-west-1). The owner's browser also got one `504` from Supabase's own password-login endpoint during the same period. No server code had changed in the preceding pushes (only client files).
+
+**Not found:** why individual requests stall. Candidates: the Supabase free plan's shared resources, or a stale reused connection inside a function instance. Neither could be confirmed because neither the Supabase logs nor the Vercel project are reachable from the tools used here.
+
+**Mitigation (DEC-126):** server-side reads to Supabase that have not answered within 8 s are cut and asked again (twice at most); writes are never repeated. The admin's session check also gives up on a stalled `/api/auth/me` after 10 s and uses its existing retry.
+
+**Open:** if stalls still show in Vercel logs after this, read Supabase's Auth and API logs in the dashboard around the stall time, and consider the Pro plan (dedicated compute; also daily backups, which the free plan does not give).
