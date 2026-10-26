@@ -8,6 +8,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { Phone, ChevronDown, User, LogOut, ShieldCheck, Lock } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { CLIENT } from "@/config/client";
+import { getPublicPageSettings } from "@/lib/publicPageSettings";
 
 const NAV_LINKS = [
   { key: "home" as const, href: "/" },
@@ -33,11 +34,13 @@ export function Navbar() {
 
   useEffect(() => {
     let isMounted = true;
-    const loadHeaderSettings = async () => {
+    // RISK-137: one shared read (lib/publicPageSettings) instead of a fetch per mount, per window
+    // focus and per visibilitychange. A copy younger than 5 minutes is reused; an explicit
+    // settings-change event forces a fresh read.
+    const loadHeaderSettings = async (force = false) => {
       try {
-        const res = await fetch("/api/page-settings", { cache: "no-store" });
-        if (res.ok && isMounted) {
-          const data = await res.json();
+        const data = await getPublicPageSettings({ force });
+        if (data && isMounted) {
           setShowCustomerLogin(data?.header?.showCustomerLogin === true || data?.showCustomerLogin === true);
         }
       } catch (err) {
@@ -50,7 +53,7 @@ export function Navbar() {
       if (e?.detail?.showCustomerLogin !== undefined) {
         setShowCustomerLogin(e.detail.showCustomerLogin);
       } else {
-        loadHeaderSettings();
+        loadHeaderSettings(true);
       }
     };
 
@@ -63,7 +66,7 @@ export function Navbar() {
             return;
           }
         } catch {}
-        loadHeaderSettings();
+        loadHeaderSettings(true);
       }
     };
 
@@ -79,14 +82,16 @@ export function Navbar() {
             if (ev.data.showCustomerLogin !== undefined) {
               setShowCustomerLogin(ev.data.showCustomerLogin);
             } else {
-              loadHeaderSettings();
+              loadHeaderSettings(true);
             }
           }
         };
       } catch {}
     }
 
+    // Returning to the tab only re-reads when the shared copy is older than 5 minutes.
     const handleFocus = () => {
+      if (document.visibilityState === "hidden") return;
       loadHeaderSettings();
     };
     window.addEventListener("focus", handleFocus);

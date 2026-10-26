@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { requireStaffAccess } from '@/lib/access';
+import { publicReadHeaders } from '@/lib/publicCache';
 
 export const dynamic = 'force-dynamic';
 
@@ -198,7 +199,7 @@ export async function GET(req: Request) {
       }
     }
 
-    return NextResponse.json(mappedPackages);
+    return NextResponse.json(mappedPackages, { headers: publicReadHeaders(req) });
   } catch (err: any) {
     console.error('GET /api/packages error:', err);
     return NextResponse.json({ error: err.message || 'Database error' }, { status: 500 });

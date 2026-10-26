@@ -24,6 +24,7 @@ import { translations } from "@/lib/translations";
 import { CLIENT } from "@/config/client";
 import { getRoleSlug, getRoleDisplayName, isPortalRoleMatch, normalizeWorkspace, type RoleWorkspace } from "@/lib/roleUtils";
 import { adminTranslations } from "@/components/admin/translations";
+import { describeDeletionCounts, type PatientDeletionCounts } from "@/lib/customerDeletionText";
 import UserProfileView, { UserProfileViewTranslations } from "@/components/admin/UserProfileView";
 import ClinicProfileSettingsView from "@/components/admin/settings/ClinicProfileSettingsView";
 import MedicalRecordsSettingsView from "@/components/admin/settings/MedicalRecordsSettingsView";
@@ -173,6 +174,8 @@ import TermsManagerView from "@/components/TermsManagerView";
 import { useAlertConfirm } from "@/contexts/AlertConfirmContext";
 import { cachedFetch, clearFetchCache } from "@/lib/fetchCache";
 import { pollDataEqual } from "@/lib/pollEqual";
+import { startVisiblePoll } from "@/lib/visiblePoll";
+import { canLoadAdminDirectory, loadAdminDirectory } from "@/lib/adminDirectory";
 import { getEmployeeBranchIds } from "@/lib/employeeBranches";
 
 export type Req = {
@@ -847,6 +850,17 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   // always to the superadmin, who is not listed under Employees (so cannot tick the box) and needs
   // the screen for support. Other admins do not see it.
   const canSwitchWorkspace = adminRole === "superadmin" || adminIsAlsoDoctor;
+  // Mirror of adminRole for code that runs right after the role is learned, before React re-renders
+  // (the first roles/employees load); see canLoadAdminDirectory.
+  const adminRoleRef = useRef<string | null>(null);
+  useEffect(() => {
+    adminRoleRef.current = adminRole;
+  }, [adminRole]);
+  // DEC-113: the doctor screens are chosen by the role's workspace setting, never by guessing from
+  // the person's name, department or role name. An admin/superadmin can also open them on purpose.
+  // Declared here (not next to the early return that uses it) so the booking poll can stand down
+  // while the doctor screens are shown: they load their own reservations (DEC-132).
+  const showDoctorWorkspace = adminWorkspace === "doctor" || (canSwitchWorkspace && viewAsDoctor);
   const [adminPermissions, setAdminPermissions] = useState<string[]>([]);
   const hasPermission = useCallback((permKey: string): boolean => {
     if (adminRole === 'superadmin') return true;
@@ -1234,6 +1248,14 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   const [selectedCustomerForEdit, setSelectedCustomerForEdit] = useState<Customer | null>(null);
   const [deleteCustomerTarget, setDeleteCustomerTarget] = useState<Customer | null>(null);
   const [deletingCustomer, setDeletingCustomer] = useState(false);
+  // DEC-132: what a permanent delete would remove, shown before the superadmin confirms.
+  const [deletePreview, setDeletePreview] = useState<
+    | { state: "loading" }
+    | { state: "error"; message: string }
+    | { state: "ready"; counts: PatientDeletionCounts; keptBookingsOtherName: number }
+    | null
+  >(null);
+  const [hardDeleteArmed, setHardDeleteArmed] = useState(false);
 
   // Checkout & Payment states
   const [checkoutBooking, setCheckoutBooking] = useState<any>(null);
@@ -1932,6 +1954,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             return;
           }
 
+          adminRoleRef.current = authData.role;
           setAdminRole(authData.role);
           setAdminWorkspace(normalizeWorkspace(authData.workspace));
           setAdminIsAlsoDoctor(authData.isAlsoDoctor === true);
@@ -2263,31 +2286,18 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   }, [adminEmail, employeesList, adminRole]);
 
   async function fetchRolesAndEmployees() {
-    console.log("RBAC - fetchRolesAndEmployees called!");
+    // Only the owner and admins may read these lists (the server answers 403 to everyone else), so
+    // other roles do not ask at all (RISK-138). The role comes from the ref: this is also called in
+    // the same tick that learns the role, before state has caught up.
+    if (!session?.access_token || !canLoadAdminDirectory(adminRoleRef.current)) return;
     if (employeesList.length === 0) setLoadingRolesAndEmployees(true);
     try {
-      if (!session?.access_token) return;
-      const headers = { Authorization: `Bearer ${session.access_token}` };
       // Each list is loaded on its own so one slow or failing request no longer throws away the
-      // other, each has a time limit so it cannot hang forever, and a failure is retried once.
-      const loadJson = async (url: string) => {
-        let lastError: unknown;
-        for (let attempt = 0; attempt < 2; attempt++) {
-          try {
-            const res = await fetch(url, { headers, cache: 'no-store', signal: AbortSignal.timeout(20000) });
-            if (res.ok) return await res.json();
-            lastError = new Error(`${url} responded ${res.status}`);
-          } catch (e) {
-            lastError = e;
-          }
-          if (attempt === 0) await new Promise((r) => setTimeout(r, 2000));
-        }
-        throw lastError;
-      };
-      const [rolesResult, employeesResult] = await Promise.allSettled([
-        loadJson('/api/roles'),
-        loadJson('/api/employees'),
-      ]);
+      // other, each has a time limit so it cannot hang forever, and a failure is retried once
+      // (a refusal, 401/403, is never retried).
+      const loaded = await loadAdminDirectory({ role: adminRoleRef.current, accessToken: session.access_token });
+      if (!loaded) return;
+      const { roles: rolesResult, employees: employeesResult } = loaded;
       if (rolesResult.status === 'fulfilled') setRolesList(rolesResult.value);
       if (employeesResult.status === 'fulfilled') setEmployeesList(employeesResult.value);
       if (rolesResult.status === 'rejected' || employeesResult.status === 'rejected') {
@@ -2576,16 +2586,12 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     if (!session || !adminRole) return;
     if (adminRole !== 'superadmin' && adminRole !== 'admin' && adminRole !== 'HR') return;
 
-    fetchHrAlerts();
-
     const isTestMode = typeof window !== "undefined" && window.location.search.includes("test_presence=true");
     const intervalMs = isTestMode ? 5000 : 30000;
 
-    const poll = setInterval(() => {
-      fetchHrAlerts();
-    }, intervalMs);
-
-    return () => clearInterval(poll);
+    // First load now, then every interval while the tab is visible; never overlapping, paused in a
+    // hidden tab and refreshed when it is shown again (RISK-138).
+    return startVisiblePoll(fetchHrAlerts, intervalMs, { immediate: true });
   }, [session, adminRole]);
 
   async function handleAdminLogin(e: React.FormEvent) {
@@ -4252,12 +4258,12 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     });
   }, [activeNav]);
 
-  // Re-fetch bookings whenever branch selection changes and poll every 15 seconds for new requests
+  // Re-fetch bookings whenever branch selection changes and poll every 15 seconds for new requests.
+  // The poll runs only while the tab is visible (a hidden tab is refreshed once when shown again) and
+  // not at all while the doctor screens are displayed, which load their own reservations (DEC-132).
   useEffect(() => {
     if (!branch) return; // wait until branches are loaded
-
-    let isMounted = true;
-    let timerId: NodeJS.Timeout;
+    if (showDoctorWorkspace) return;
 
     // Spinner only for the first load or a branch switch. This effect also re-runs when the login
     // token rotates, which must not flash the booking tables.
@@ -4282,21 +4288,11 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
         } else {
           console.error("Polling error:", err);
         }
-      } finally {
-        if (isMounted) {
-          // Schedule next poll in 15 seconds
-          timerId = setTimeout(poll, 15000);
-        }
       }
     };
 
-    // Start background poll after 15 seconds
-    timerId = setTimeout(poll, 15000);
-
-    return () => {
-      isMounted = false;
-      clearTimeout(timerId);
-    };
+    // First background poll 15 seconds from now, then 15 seconds after each one finished.
+    return startVisiblePoll(poll, 15000);
   // RISK-053: this effect closes over fetchRequests/fetchAllReservations, which close over
   // authenticatedJsonHeaders/session. Without session?.access_token in the deps, the poll loop
   // keeps calling the closures captured whenever this effect last ran (i.e. whenever `branch`
@@ -4308,7 +4304,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   // session exists in state and localStorage. Re-creating the poll when the token value changes
   // keeps it on the live token going forward.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [branch, session?.access_token]);
+  }, [branch, session?.access_token, showDoctorWorkspace]);
 
   // Fetch ALL reservations (no branch filter) for the schedule view whenever the date or view changes
   useEffect(() => {
@@ -5591,6 +5587,34 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     setImportLog([]);
   };
 
+  useEffect(() => {
+    setHardDeleteArmed(false);
+    if (!deleteCustomerTarget?.id || adminRole !== "superadmin") {
+      setDeletePreview(null);
+      return;
+    }
+    let cancelled = false;
+    setDeletePreview({ state: "loading" });
+    fetch(`/api/customers?id=${encodeURIComponent(deleteCustomerTarget.id)}&deletePreview=1`, {
+      headers: { Authorization: `Bearer ${session?.access_token || ""}` },
+    })
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Could not check what will be deleted");
+        return data;
+      })
+      .then((data) => {
+        if (!cancelled) setDeletePreview({ state: "ready", counts: data.counts, keptBookingsOtherName: data.keptBookingsOtherName || 0 });
+      })
+      .catch((err) => {
+        if (!cancelled) setDeletePreview({ state: "error", message: err.message || "Could not check what will be deleted" });
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deleteCustomerTarget?.id, adminRole]);
+
   function handleDeleteCustomer(id: string, mode: 'soft' | 'hard' = 'hard') {
     setDeletingCustomer(true);
     fetch(`/api/customers?id=${id}&mode=${mode}`, {
@@ -6118,10 +6142,6 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
   const loggedEmpAccount = employeesList.find(
     (e) => e.id === adminDbId || e.email?.toLowerCase() === adminEmail.toLowerCase()
   );
-
-  // DEC-113: the doctor screens are chosen by the role's workspace setting, never by guessing from
-  // the person's name, department or role name. An admin/superadmin can also open them on purpose.
-  const showDoctorWorkspace = adminWorkspace === "doctor" || (canSwitchWorkspace && viewAsDoctor);
 
   if (showDoctorWorkspace) {
     return (
@@ -9644,8 +9664,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
 
                   <button
                     type="button"
-                    disabled={deletingCustomer}
-                    onClick={() => handleDeleteCustomer(deleteCustomerTarget.id!, 'hard')}
+                    disabled={deletingCustomer || hardDeleteArmed || deletePreview?.state !== "ready"}
+                    onClick={() => setHardDeleteArmed(true)}
                     className="flex items-start gap-3 p-3 rounded-xl border border-rose-300 bg-rose-50/60 hover:bg-rose-50 text-start transition cursor-pointer disabled:opacity-50"
                   >
                     <div className="h-8 w-8 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center shrink-0 mt-0.5">
@@ -9657,15 +9677,61 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                         <span className="text-[9px] font-bold uppercase bg-rose-200/70 text-rose-900 px-2 py-0.5 rounded-full">Irreversible</span>
                       </div>
                       <p className="text-[11px] text-rose-900/80 mt-0.5">
-                        Permanently removes this profile. Only allowed for a patient with no bookings, payments, packages, wallet or medical history; otherwise it tells you what blocks it. Use Soft Delete to keep the history.
+                        {lang === "ar"
+                          ? "يحذف الملف نهائياً مع كل ما يخص المريض: الحجوزات والمدفوعات والباقات والمحفظة والسجلات الطبية. لا يمكن التراجع. للاحتفاظ بالسجل استخدم الحذف المؤقت."
+                          : "Permanently deletes this profile together with everything that belongs to the patient: bookings, payments, packages, wallet and medical records. It cannot be undone. Use Soft Delete to keep the history."}
                       </p>
                     </div>
                   </button>
+
+                  {deletePreview?.state === "loading" && (
+                    <p className="text-[11px] text-[var(--color-brand-secondary)]">
+                      {lang === "ar" ? "جاري حساب ما سيتم حذفه..." : "Checking what would be deleted..."}
+                    </p>
+                  )}
+                  {deletePreview?.state === "error" && (
+                    <p className="text-[11px] font-semibold text-rose-700">
+                      {lang === "ar"
+                        ? "تعذر حساب ما سيتم حذفه، لذلك الحذف النهائي غير متاح الآن: "
+                        : "Could not check what would be deleted, so permanent delete is unavailable right now: "}
+                      {deletePreview.message}
+                    </p>
+                  )}
+                  {hardDeleteArmed && deletePreview?.state === "ready" && (
+                    <div className="rounded-xl border border-rose-400 bg-rose-50 p-3 space-y-2">
+                      <p className="text-xs font-bold text-rose-950">
+                        {lang === "ar" ? "سيتم حذف ما يلي نهائياً:" : "This will permanently delete:"}
+                      </p>
+                      <p className="text-xs text-rose-900 leading-relaxed">
+                        {describeDeletionCounts(deletePreview.counts, lang === "ar" ? "ar" : "en") ||
+                          (lang === "ar"
+                            ? "لا توجد حجوزات أو مدفوعات أو سجلات أخرى لهذا المريض."
+                            : "No bookings, payments or other records are attached to this patient.")}
+                      </p>
+                      {deletePreview.keptBookingsOtherName > 0 && (
+                        <p className="text-[11px] text-rose-900/80">
+                          {lang === "ar"
+                            ? `${deletePreview.keptBookingsOtherName} حجز غير مرتبط بنفس رقم الهاتف لكن باسم مختلف لن يُحذف، وقد يظهر كمريض منفصل.`
+                            : `${deletePreview.keptBookingsOtherName} un-linked booking(s) with the same phone but a different name will not be deleted and may still show as a separate patient.`}
+                        </p>
+                      )}
+                      <button
+                        type="button"
+                        disabled={deletingCustomer}
+                        onClick={() => handleDeleteCustomer(deleteCustomerTarget.id!, "hard")}
+                        className="rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {deletingCustomer
+                          ? (lang === "ar" ? "جاري الحذف..." : "Deleting...")
+                          : (lang === "ar" ? "نعم، احذف كل شيء نهائياً" : "Yes, permanently delete everything")}
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
               <p className="text-xs text-[var(--color-brand-secondary)] mb-5 leading-relaxed">
-                This action will permanently delete the customer profile. It is refused if the patient has bookings, payments, packages, wallet or medical history.
+                This action permanently deletes the customer profile together with all of the patient's bookings, payments, packages, wallet and medical records. Only a Super Admin can do this.
               </p>
             )}
 

@@ -6,6 +6,8 @@ import fs from 'fs';
 import path from 'path';
 import { getDoctorRoleNames } from '@/lib/roleWorkspace';
 import { deactivateEmployeeForProvider } from '@/lib/accountAccess';
+import { mapPublicProvider } from '@/lib/publicProvider';
+import { publicReadHeaders, NO_SHARED_CACHE_CONTROL } from '@/lib/publicCache';
 
 export const dynamic = 'force-dynamic';
 
@@ -73,8 +75,66 @@ function mapProvider(p: Record<string, any>, bookingsCount: number = 0) {
   };
 }
 
- 
-export async function GET() {
+
+// RISK-140 / DEC-134: this endpoint used to return every doctor's phone, email, national id,
+// salary and commission settings to ANY visitor. Now:
+//  - a valid STAFF bearer token gets the full response (unchanged shape, plus the booking counts and
+//    the employee -> provider auto-sync, which are staff-only work);
+//  - everyone else (no Authorization header, a junk / expired token, or a valid token that belongs to
+//    a non-staff user) gets the allow-listed public projection (mapPublicProvider), which is also
+//    what the public booking popup needs. The public variant skips the reservations and
+//    employee_accounts reads and never writes to the database.
+// Cache rule (RISK-137): only the anonymous public projection may use the shared-cache header; any
+// request carrying an Authorization header is `private, no-store` (publicReadHeaders).
+async function resolveCaller(req?: Request): Promise<{ kind: 'staff' } | { kind: 'public' } | { kind: 'error'; status: number; message: string }> {
+  if (!req || !req.headers.has('authorization')) return { kind: 'public' };
+  const access = await requireStaffAccess(req);
+  if ('access' in access) return { kind: 'staff' };
+  // 401 (bad / expired token) and 403 (not staff, or inactive staff) are ordinary "not staff" answers.
+  if (access.status === 401 || access.status === 403) return { kind: 'public' };
+  // 500 / 503: the check itself could not be completed. Do NOT degrade a real staff request to the
+  // public projection: the Doctors screen would then show salaries as 0 and an edit could save them.
+  return { kind: 'error', status: access.status, message: access.error };
+}
+
+async function getPublicProviders(req?: Request) {
+  try {
+    const providersRes = await supabaseServer
+      .from('providers')
+      .select('*')
+      .order('name', { ascending: true });
+    const rows = providersRes.data || [];
+    if (!providersRes.error && rows.length > 0) {
+      return NextResponse.json(rows.map((p: any) => mapPublicProvider(p)), { headers: publicReadHeaders(req) });
+    }
+    if (providersRes.error) {
+      console.warn("Supabase providers query error, falling back to JSON:", providersRes.error);
+    }
+  } catch (dbErr) {
+    console.error("Database providers load error, falling back to JSON:", dbErr);
+  }
+
+  // Fallback to the local JSON file (never shared-cacheable). The file may hold raw staff fields, so
+  // it goes through the same allow-list; nothing is created or written on a public request.
+  try {
+    if (!fs.existsSync(JSON_FILE_PATH)) return NextResponse.json([]);
+    const local = JSON.parse(fs.readFileSync(JSON_FILE_PATH, 'utf-8'));
+    return NextResponse.json(
+      Array.isArray(local) ? local.filter((p: any) => p && typeof p === 'object').map((p: any) => mapPublicProvider(p)) : []
+    );
+  } catch (err) {
+    console.error("JSON fallback load error:", err);
+    return NextResponse.json([]);
+  }
+}
+
+export async function GET(req?: Request) {
+  const caller = await resolveCaller(req);
+  if (caller.kind === 'error') {
+    return NextResponse.json({ error: caller.message }, { status: caller.status, headers: { 'Cache-Control': NO_SHARED_CACHE_CONTROL } });
+  }
+  if (caller.kind === 'public') return getPublicProviders(req);
+
   try {
     // DEC-113: a "doctor employee" is one whose role has the doctor workspace.
     const doctorRoleNames = await getDoctorRoleNames();
@@ -89,7 +149,9 @@ export async function GET() {
         .neq('status', 'rejected'),
       supabaseServer
         .from('employee_accounts')
-        .select('*')
+        // Only what the auto-sync below reads. `select *` also pulled the base64 national-id
+        // images (national_id_front/back) of every employee on every public page view.
+        .select('name, phone, salary, branch_id, national_id, role_name, is_also_doctor')
         .not('role_name', 'is', null)
     ]);
     const docEmployeesRes = {
@@ -143,7 +205,7 @@ export async function GET() {
         const bookingsCount = counts.get(key) || 0;
         return mapProvider(p, bookingsCount);
       });
-      return NextResponse.json(mapped);
+      return NextResponse.json(mapped, { headers: publicReadHeaders(req) });
     } else {
       if (providersRes.error) {
         console.warn("Supabase providers query error, falling back to JSON:", providersRes.error);
@@ -243,19 +305,9 @@ export async function POST(req: Request) {
     service_commissions: normalizeServiceCommissions(serviceCommissions),
   };
 
-  const authHeader = req.headers.get('Authorization') || '';
-  const token = authHeader.replace('Bearer ', '').trim();
-  let changedBy = 'System/Unknown';
-  if (token) {
-    try {
-      const { data: { user } } = await supabaseServer.auth.getUser(token);
-      if (user?.email) {
-        changedBy = user.email;
-      }
-    } catch (e) {
-      console.warn("Could not get user from auth token in providers API:", e);
-    }
-  }
+  // RISK-134: the audit trail takes the caller's email from the access check above; it used to ask
+  // the Auth server a second time (getUser) for the same token on every write.
+  const changedBy = access.access.user.email || 'System/Unknown';
 
   try {
     const { data, error } = await supabaseServer
@@ -428,19 +480,9 @@ export async function PATCH(req: Request) {
   if (commissionFixedComponent !== undefined) updates.commission_fixed_component = Number(commissionFixedComponent || 0);
   if (serviceCommissions !== undefined) updates.service_commissions = normalizeServiceCommissions(serviceCommissions);
 
-  const authHeader = req.headers.get('Authorization') || '';
-  const token = authHeader.replace('Bearer ', '').trim();
-  let changedBy = 'System/Unknown';
-  if (token) {
-    try {
-      const { data: { user } } = await supabaseServer.auth.getUser(token);
-      if (user?.email) {
-        changedBy = user.email;
-      }
-    } catch (e) {
-      console.warn("Could not get user from auth token in providers API:", e);
-    }
-  }
+  // RISK-134: the audit trail takes the caller's email from the access check above; it used to ask
+  // the Auth server a second time (getUser) for the same token on every write.
+  const changedBy = access.access.user.email || 'System/Unknown';
 
   try {
     // `id` is mandatory (400 above) and providers has no unique constraint on `name`, so an

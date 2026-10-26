@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { requireAdministratorAccess } from '@/lib/access';
+import { publicReadHeaders } from '@/lib/publicCache';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(req?: Request) {
   try {
     const { data, error } = await supabaseServer
       .from('branches')
@@ -12,7 +13,7 @@ export async function GET() {
       .order('sort_order', { ascending: true });
 
     if (error) throw error;
-    return NextResponse.json(data ?? []);
+    return NextResponse.json(data ?? [], { headers: publicReadHeaders(req) });
   } catch (err) {
     console.error('GET /api/branches error:', err);
     return NextResponse.json([], { status: 200 });

@@ -217,7 +217,7 @@ describe('ongoing session — booking ended by someone else (RISK-123)', () => {
 
 // The doctor's screen learns about reception's changes through this poll (realtime does not reach the browser
 // for reservations). It must not stack requests on top of a slow one or keep running in a hidden tab.
-describe('reservations poll (every 3 s)', () => {
+describe('reservations poll (every 15 s)', () => {
   const reservationCalls = () => fetchFake.calls.filter((c) => c.method === 'GET' && c.path === '/api/reservations').length;
   const setVisibility = (state: 'visible' | 'hidden') =>
     Object.defineProperty(document, 'visibilityState', { value: state, configurable: true });
@@ -240,13 +240,13 @@ describe('reservations poll (every 3 s)', () => {
     setVisibility('visible');
   });
 
-  it('polls every 3 s when each request finishes in time', async () => {
+  it('polls every 15 s when each request finishes in time', async () => {
     fetchFake.on('GET', '/api/reservations', () => ({ status: 200, body: [reservation({})] }));
     render(<DoctorAccountView {...BASE_PROPS} />);
     await advance(0);
     const afterMount = reservationCalls();
 
-    await advance(9000);
+    await advance(45000);
     expect(reservationCalls() - afterMount).toBe(3);
   });
 
@@ -262,7 +262,7 @@ describe('reservations poll (every 3 s)', () => {
 
     release();
     await advance(0);
-    await advance(3000);
+    await advance(15000);
     expect(reservationCalls()).toBe(afterMount + 1);
   });
 

@@ -6,6 +6,8 @@
  * on rejection — not the data itself.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { claimsFromGetUser } from '../helpers/supabaseFake';
+import { clearTokenCache } from '@/lib/verifyToken';
 
 // ── Mock infrastructure ──────────────────────────────────────────────────────
 
@@ -27,7 +29,7 @@ function createChain(): any {
 
 vi.mock('@/lib/supabaseServer', () => ({
   supabaseServer: {
-    auth: { getUser: (...args: any[]) => mockAuthGetUser(...args) },
+    auth: { getUser: (...args: any[]) => mockAuthGetUser(...args), getClaims: (...args: any[]) => claimsFromGetUser(mockAuthGetUser)(args[0]) },
     from: (_table: string) => createChain(),
   },
 }));
@@ -63,6 +65,7 @@ function patientAuthReq(url = ''): Request {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  clearTokenCache();
   setupUnauthenticated();
   mockFromData.mockReturnValue({ data: null, error: null });
 });

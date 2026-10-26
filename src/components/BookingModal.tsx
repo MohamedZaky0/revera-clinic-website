@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo, useRef, type MouseEvent } fr
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { cachedFetch, prefetchUrl } from "@/lib/fetchCache";
+import { getPublicPageSettings } from "@/lib/publicPageSettings";
 import { Category, ServiceItem, ALL_15MIN_SLOTS, getServiceDurationMinutes, normaliseTo24hSlot, getEffectiveServicePrice } from "@/lib/services";
 import { 
   getServiceToggles, 
@@ -163,6 +164,17 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
   const [branches, setBranches] = useState<any[]>([]);
   const [branchId, setBranchId] = useState<string | null>(null);
 
+  // RISK-137: the six reads below (categories, services, branches, providers, page-settings, terms)
+  // used to fire on mount of EVERY page because this component lives in the root layout. They now
+  // run once, the first time the popup opens (or at once for the /book page variant).
+  const dataLoadStartedRef = useRef(false);
+  const [categoriesLoaded, setCategoriesLoaded] = useState(false);
+  const [servicesLoaded, setServicesLoaded] = useState(false);
+  const dataReady = categoriesLoaded && servicesLoaded;
+  // An "open-booking" event that arrived before categories/services were loaded. It is replayed
+  // once they are, so the category/session-type preselection sees real data.
+  const pendingOpenRef = useRef<{ detail: unknown } | null>(null);
+
   const stepsList = useMemo(() => {
     const isPaymentRequired = depositPercentage > 0;
     if (isPaymentRequired) {
@@ -226,6 +238,11 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
 
   useEffect(() => {
     const handler = (e: Event) => {
+      if (!isPageVariant && !dataReady) {
+        pendingOpenRef.current = { detail: (e as CustomEvent).detail ?? null };
+        setOpen(true);
+        return;
+      }
       const detail = (e as CustomEvent).detail as { serviceId?: number } | null;
       // A ?service= link or button for a service that is not on the website (DEC-111) opens the
       // booking with nothing preselected instead of offering it.
@@ -255,7 +272,17 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
     };
     window.addEventListener("open-booking", handler);
     return () => window.removeEventListener("open-booking", handler);
-  }, [dynamicServices, dynamicCategories]);
+  }, [dynamicServices, dynamicCategories, dataReady, isPageVariant]);
+
+  // Replay a deferred "open-booking" once the data it needs has arrived. Declared after the
+  // handler effect on purpose: in the commit where dataReady flips, the handler is re-registered
+  // first and then this runs, so the replay is handled with the loaded services/categories.
+  useEffect(() => {
+    if (!dataReady || !pendingOpenRef.current) return;
+    const pending = pendingOpenRef.current;
+    pendingOpenRef.current = null;
+    window.dispatchEvent(new CustomEvent("open-booking", { detail: pending.detail }));
+  }, [dataReady]);
 
   // Page variant: apply the ?service= preselection once dynamicServices has loaded (or
   // immediately if none was requested), by re-dispatching the same "open-booking" event the
@@ -326,7 +353,20 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
   }, [sessionType, serviceId, dynamicServices]);
 
   useEffect(() => {
-    fetch("/api/categories", { cache: "no-store" })
+    const handleStorage = () => {
+      setDynamicCategories(getDynamicCategories());
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
+
+  useEffect(() => {
+    if (!open || dataLoadStartedRef.current) return;
+    dataLoadStartedRef.current = true;
+
+    // Categories and services answer the same for every anonymous visitor and are sent with a
+    // shared-cache header by the API, so no `cache: "no-store"` here.
+    fetch("/api/categories")
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => {
         if (Array.isArray(data)) {
@@ -334,10 +374,14 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
         } else {
           setDynamicCategories(getDynamicCategories());
         }
+        setCategoriesLoaded(true);
       })
-      .catch(() => setDynamicCategories(getDynamicCategories()));
+      .catch(() => {
+        setDynamicCategories(getDynamicCategories());
+        setCategoriesLoaded(true);
+      });
 
-    fetch("/api/services", { cache: "no-store" })
+    fetch("/api/services")
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => {
         const list = Array.isArray(data) ? data : [];
@@ -346,18 +390,14 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
           list.map((s: any) => [s.id, { visible: s.visible !== false, active: s.active !== false }])
         );
         setServiceToggles(dbToggles);
+        setServicesLoaded(true);
       })
-      .catch(() => setDynamicServices([]));
+      .catch(() => {
+        setDynamicServices([]);
+        setServicesLoaded(true);
+      });
 
-    const handleStorage = () => {
-      setDynamicCategories(getDynamicCategories());
-    };
-    window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
-  }, []);
-
-  // Load branches
-  useEffect(() => {
+    // Load branches
     fetch("/api/branches")
       .then((r) => r.json())
       .then((data) => {
@@ -368,24 +408,20 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
         }
       })
       .catch(() => {});
-  }, []);
 
-  // Load doctors
-  useEffect(() => {
+    // Load doctors
     fetch("/api/providers")
       .then((r) => r.json())
       .then((data) => {
         setDoctors(data || []);
       })
       .catch(() => {});
-  }, []);
 
-  // Load deposit percentage settings
-  useEffect(() => {
-    fetch("/api/page-settings")
-      .then((r) => r.json())
+    // Load deposit percentage settings (shared with Navbar/LanguageProvider: one request per view)
+    getPublicPageSettings({ maxAgeMs: 60_000 })
       .then((data) => {
-        if (data && data.deposit) {
+        if (!data) return;
+        if (data.deposit) {
           if (data.deposit.depositPercentage !== undefined) {
             setDepositPercentage(Number(data.deposit.depositPercentage));
           }
@@ -416,16 +452,16 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
           if (data.deposit.walletLink) {
             setWalletLink(data.deposit.walletLink);
           }
-        } else if (data && data.booking && data.booking.depositPercentage !== undefined) {
+        } else if (data.booking && data.booking.depositPercentage !== undefined) {
           setDepositPercentage(Number(data.booking.depositPercentage));
         }
-        if (data && data.clinic && data.clinic.whatsapp) {
+        if (data.clinic && data.clinic.whatsapp) {
           setClinicWhatsapp(data.clinic.whatsapp);
         }
-        if (data && data.booking && data.booking.termsText) {
+        if (data.booking && data.booking.termsText) {
           setTermsText(data.booking.termsText);
         }
-        if (data && data.footer && Array.isArray(data.footer.serviceHours)) {
+        if (data.footer && Array.isArray(data.footer.serviceHours)) {
           setServiceHours(data.footer.serviceHours);
         }
       })
@@ -439,7 +475,7 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
         }
       })
       .catch(() => {});
-  }, []);
+  }, [open]);
 
   // Comma-joined ids for every selected service, appended to every availability request so the
   // server sums duration / requires one doctor+room covering all of them (CORRUPT-U06). Empty

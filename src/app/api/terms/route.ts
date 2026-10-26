@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { requireAdministratorAccess } from '@/lib/access';
+import { publicReadHeaders } from '@/lib/publicCache';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,7 +27,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ terms: [], error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ terms: data || [] });
+    return NextResponse.json({ terms: data || [] }, { headers: publicReadHeaders(req) });
   } catch (err: any) {
     console.error('GET /api/terms error:', err);
     return NextResponse.json({ error: err.message || 'Database error' }, { status: 500 });

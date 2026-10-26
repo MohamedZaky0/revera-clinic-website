@@ -3,7 +3,16 @@ import { supabaseServer } from '@/lib/supabaseServer';
 import { requireAdministratorAccess, requireAuthenticatedUser, requireStaffAccess, requireSuperadminAccess, type StaffAccess } from '@/lib/access';
 import { isOwnIdentity, normalizeEgyptMobile } from '@/lib/customerIdentity';
 import { recordWalletMovement, setAbsoluteWalletBalance } from '@/lib/wallet';
-import { UUID_REGEX, countPatientHistory, derivedPhoneFragment, describeBlockers, hasBlockingHistory } from '@/lib/customerDeletion';
+import {
+  UUID_REGEX,
+  PatientDeletionError,
+  auditLine,
+  derivedPhoneFragment,
+  executeDeletionPlan,
+  planDerivedDeletion,
+  planPatientDeletion,
+  type DeletionPlan,
+} from '@/lib/customerDeletion';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -37,7 +46,68 @@ export async function classifyCaller(req: Request): Promise<Caller> {
   return { kind: 'patient', user: userResult.user };
 }
 
+/**
+ * What a permanent delete of this patient (or of a booking-derived entry, `res-cust-<phone>`) would
+ * remove. Read only, superadmin only; the admin delete dialog shows it before the confirm (DEC-132).
+ */
+async function deletePreview(req: Request, id: string | null) {
+  const access = await requireSuperadminAccess(req);
+  if ('error' in access) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+  if (!id) {
+    return NextResponse.json({ error: 'Customer ID is required' }, { status: 400 });
+  }
+  try {
+    let plan: DeletionPlan;
+    let derived = false;
+    if (UUID_REGEX.test(id)) {
+      const { data: customer, error } = await supabaseServer
+        .from('customers')
+        .select('id, name, mobile')
+        .eq('id', id)
+        .maybeSingle();
+      if (error) throw error;
+      if (!customer) return NextResponse.json({ error: 'Patient not found. Refresh the list.' }, { status: 404 });
+      plan = await planPatientDeletion(customer);
+    } else {
+      const fragment = derivedPhoneFragment(id);
+      if (!fragment) {
+        return NextResponse.json({ error: DERIVED_NO_PHONE_MESSAGE }, { status: 400 });
+      }
+      const derivedPlan = await planDerivedDeletion(fragment);
+      if (derivedPlan === 'owned') {
+        return NextResponse.json({ error: PATIENT_RECORD_EXISTS_MESSAGE, code: 'PATIENT_RECORD_EXISTS' }, { status: 409 });
+      }
+      if (derivedPlan.counts.bookings === 0) {
+        return NextResponse.json({ error: 'This patient no longer exists. Refresh the list.' }, { status: 404 });
+      }
+      plan = derivedPlan;
+      derived = true;
+    }
+    return NextResponse.json({
+      patientId: id,
+      derived,
+      name: plan.name,
+      counts: plan.counts,
+      keptBookingsOtherName: plan.keptBookingsOtherName,
+    });
+  } catch (err: any) {
+    console.error('GET /api/customers deletePreview error:', err);
+    return NextResponse.json({ error: err.message || 'Database error' }, { status: 500 });
+  }
+}
+
+const DERIVED_NO_PHONE_MESSAGE =
+  'This entry has no patient record and no phone number to trace its bookings by. Find its bookings in the Bookings screen and delete them there.';
+const PATIENT_RECORD_EXISTS_MESSAGE =
+  'A patient record with this phone number now exists, so these bookings belong to that patient. Refresh the list and delete the patient from there.';
+
 export async function GET(req: Request) {
+  const previewParams = new URL(req.url).searchParams;
+  if (previewParams.get('deletePreview')) {
+    return deletePreview(req, previewParams.get('id'));
+  }
   const caller = await classifyCaller(req);
   if (caller.kind === 'unauthenticated') {
     return NextResponse.json({ error: caller.error }, { status: caller.status });
@@ -314,6 +384,47 @@ export async function POST(req: Request) {
   }
 }
 
+/**
+ * Runs the deletion plan. On a failing step answers 500 naming the step and what was already
+ * removed; the patient row is deleted last, so running the delete again finishes the job.
+ */
+async function runHardDelete(
+  plan: DeletionPlan,
+  actor: string
+): Promise<{ body: Record<string, unknown> } | { response: Response }> {
+  try {
+    const result = await executeDeletionPlan(plan);
+    console.info(auditLine(plan, result, actor));
+    return {
+      body: {
+        removed: result.removed,
+        keptBookingsOtherName: plan.keptBookingsOtherName,
+      },
+    };
+  } catch (err) {
+    if (err instanceof PatientDeletionError) {
+      console.error(`patient hard delete failed at ${err.step}:`, err.cause, 'removed so far:', err.removedSoFar);
+      return {
+        response: NextResponse.json(
+          {
+            error:
+              `The permanent delete stopped at "${err.step}": ${(err.cause as any)?.message || 'database error'}. ` +
+              (plan.customerId
+                ? 'The patient record is still there, so you can run the delete again to finish. '
+                : 'Run the delete again to finish. ') +
+              'Parts already removed stay removed.',
+            code: 'PATIENT_DELETE_FAILED',
+            failedStep: err.step,
+            removedSoFar: err.removedSoFar,
+          },
+          { status: 500 }
+        ),
+      };
+    }
+    throw err;
+  }
+}
+
 export async function DELETE(req: Request) {
   // Soft (deactivate) and hard (permanent) delete are both superadmin-only — an `admin` caller
   // would otherwise pass requireAdministratorAccess and be able to permanently remove a patient
@@ -322,6 +433,8 @@ export async function DELETE(req: Request) {
   if ('error' in access) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
+
+  const actor = access.access.user.email || access.access.user.id;
 
   try {
     const { searchParams } = new URL(req.url);
@@ -334,36 +447,38 @@ export async function DELETE(req: Request) {
 
     // The Patients list also shows "patients" that exist only because a booking carries their name
     // and phone (id `res-cust-<phone>`). There is no customers row behind those, so there is nothing
-    // to delete or deactivate: the entry goes away when its bookings do (DEC-128 / RISK-133).
+    // to deactivate. A hard delete removes the bookings that carry the phone (and their payments),
+    // which is what makes the entry disappear (DEC-132).
     if (!UUID_REGEX.test(id)) {
       const fragment = derivedPhoneFragment(id);
       if (!fragment) {
-        return NextResponse.json(
-          { error: 'This entry has no patient record and no phone number to trace its bookings by. Find its bookings in the Bookings screen and delete them there.' },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: DERIVED_NO_PHONE_MESSAGE }, { status: 400 });
       }
-      const { data: orphanBookings, error: orphanErr } = await supabaseServer
-        .from('reservations')
-        .select('id')
-        .is('customer_id', null)
-        .ilike('phone', `%${fragment}`);
-      if (orphanErr) throw orphanErr;
-      const bookings = Array.isArray(orphanBookings) ? orphanBookings.length : 0;
+      const plan = await planDerivedDeletion(fragment);
+      if (plan === 'owned') {
+        return NextResponse.json({ error: PATIENT_RECORD_EXISTS_MESSAGE, code: 'PATIENT_RECORD_EXISTS' }, { status: 409 });
+      }
+      const bookings = plan.counts.bookings;
       if (bookings === 0) {
         return NextResponse.json({ error: 'This patient no longer exists. Refresh the list.' }, { status: 404 });
       }
-      return NextResponse.json(
-        {
-          error:
-            `This patient has no patient record. It only appears in the list because of ${bookings} ${bookings === 1 ? 'booking' : 'bookings'} ` +
-            `that carry this name and phone number, so there is nothing to ${mode === 'soft' ? 'deactivate' : 'delete'} here. ` +
-            `Delete or cancel ${bookings === 1 ? 'that booking' : 'those bookings'} from the Bookings screen and the entry disappears.`,
-          code: 'PATIENT_IS_BOOKING_DERIVED',
-          blockers: { bookings },
-        },
-        { status: 409 }
-      );
+      if (mode === 'soft') {
+        return NextResponse.json(
+          {
+            error:
+              `This entry has no patient record: it only appears in the list because of ${bookings} ${bookings === 1 ? 'booking' : 'bookings'} ` +
+              `that carry this name and phone number, so there is nothing to deactivate. ` +
+              `Use Hard Delete (Permanent Removal) to delete ${bookings === 1 ? 'that booking' : 'those bookings'} and their payments, ` +
+              `or delete ${bookings === 1 ? 'it' : 'them'} one by one from the Bookings screen.`,
+            code: 'PATIENT_IS_BOOKING_DERIVED',
+            blockers: { bookings },
+          },
+          { status: 409 }
+        );
+      }
+      const outcome = await runHardDelete(plan, actor);
+      if ('response' in outcome) return outcome.response;
+      return NextResponse.json({ message: 'Customer permanently deleted successfully', ...outcome.body });
     }
 
     if (mode === 'soft') {
@@ -384,7 +499,7 @@ export async function DELETE(req: Request) {
     // 1. The patient must exist, otherwise "deleted successfully" would be a lie.
     const { data: customer, error: fetchError } = await supabaseServer
       .from('customers')
-      .select('email, mobile, auth_user_id')
+      .select('id, name, email, mobile, auth_user_id')
       .eq('id', id)
       .maybeSingle();
 
@@ -393,47 +508,12 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: 'Patient not found. Refresh the list.' }, { status: 404 });
     }
 
-    // 2. Refuse while any history hangs off the patient. Postgres would not: it un-links bookings
-    //    and payments and wipes the rest, and the un-linked bookings rebuild the patient in the list.
-    const blockers = await countPatientHistory(id);
-    if (hasBlockingHistory(blockers)) {
-      return NextResponse.json(
-        {
-          error:
-            `This patient cannot be permanently deleted: they have ${describeBlockers(blockers)}. ` +
-            'Permanent delete is only for a patient with no bookings, payments, packages, wallet or medical history. ' +
-            'Use Soft Delete (Deactivate) to hide the patient and keep that history.',
-          code: 'PATIENT_HAS_HISTORY',
-          blockers,
-        },
-        { status: 409 }
-      );
-    }
+    // 2. Work out what belongs to the patient, then delete all of it, the patient row last (DEC-132).
+    const plan = await planPatientDeletion(customer);
+    const outcome = await runHardDelete(plan, actor);
+    if ('response' in outcome) return outcome.response;
 
-    // 3. Delete the row and check that a row was really removed.
-    const { data: removed, error: deleteError } = await supabaseServer
-      .from('customers')
-      .delete()
-      .eq('id', id)
-      .select('id');
-
-    if (deleteError) {
-      if ((deleteError as any).code === '23503') {
-        return NextResponse.json(
-          { error: 'This patient is still referenced by other records and cannot be permanently deleted. Use Soft Delete (Deactivate) instead.', code: 'PATIENT_HAS_HISTORY' },
-          { status: 409 }
-        );
-      }
-      throw deleteError;
-    }
-    if (!Array.isArray(removed) || removed.length === 0) {
-      return NextResponse.json(
-        { error: 'The patient could not be deleted: the database removed no rows. Nothing was changed.' },
-        { status: 500 }
-      );
-    }
-
-    // 4. Only now remove the patient's login, so a refused or failed delete never costs them access.
+    // 3. Only now remove the patient's login, so a failed delete never costs them access.
     //    Best effort: the patient row is already gone and a leftover login does no harm.
     try {
       let authUserId: string | null = customer.auth_user_id || null;
@@ -471,7 +551,7 @@ export async function DELETE(req: Request) {
       console.error('Error looking up/deleting auth user:', authErr);
     }
 
-    return NextResponse.json({ message: 'Customer permanently deleted successfully' });
+    return NextResponse.json({ message: 'Customer permanently deleted successfully', ...outcome.body });
   } catch (err: any) {
     console.error('DELETE /api/customers error:', err);
     return NextResponse.json({ error: err.message || 'Database error' }, { status: 500 });
