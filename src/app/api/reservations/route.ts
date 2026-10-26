@@ -52,6 +52,10 @@ function mapReservationProduct(p: Record<string, any>) {
     addedBy: p.added_by_role === 'doctor_session' ? 'Doctor Session' : 'Receptionist',
     lineType: p.line_type || (p.service_id ? 'additional_service' : 'product'),
     serviceId: p.service_id ?? null,
+    // Brief 37 / RISK-138: real package links (null on pre-migration rows — those
+    // still reconstruct from `description`/`notes` text on the read side).
+    packageId: p.package_id ?? null,
+    customerPackageId: p.customer_package_id ?? null,
   };
 }
 
