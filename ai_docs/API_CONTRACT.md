@@ -188,13 +188,28 @@ Deletes a service by numeric ID.
 
 ## GET /api/providers
 
-**Cache (RISK-137 / DEC-131):** deliberately **not** cached (no `Cache-Control`): the response carries staff-only fields (`fixedSalary`, `nationalId`, `commission*`) and the admin Doctors screen reads it without a token. `employee_accounts` is read with an explicit column list; the shape is unchanged.
+**Two responses, chosen by the caller (RISK-140 / DEC-134).** No `Authorization` header, a junk or
+expired token, a valid token of a non-staff user and an inactive staff account get the **public
+projection**. A valid staff token gets the **full response**. If the token check itself fails (500/503)
+the route returns that error, never a reduced list.
 
-Returns all providers ordered by name. Auto-syncs any `employee_accounts` row that looks like a
-doctor (`department`/`role_name` matching `%doc%`) into `providers` if missing. Falls back to
+**Public response:** `PublicProvider[]` — exactly `{ id, name, specialty, image, services, rating,
+active, branchId, workingDaysHours }`, built by `mapPublicProvider` (`src/lib/publicProvider.ts`) as an
+allow-list. `workingDaysHours` keeps only `branch_ids`, `branch_schedules[branchId]`, the `in_person` /
+`online` maps and, per weekday, `isOpen`, `start`, `end`, `shifts[{start,end}]`; the `email`,
+`employment_type`, `languages`, `session_type` that POST/PATCH stash in that column are dropped.
+No phone, email, national id, salary, commission, age, gender, start date or booking count. Reads only
+the `providers` table and writes nothing. **Cache:** `Cache-Control: public, s-maxage=60,
+stale-while-revalidate=300` + `Vary: Authorization` for a request with no `Authorization` header;
+`private, no-store` when one is present. The local-JSON fallback goes through the same allow-list and is
+never cached.
+
+**Full (staff) response, cache `private, no-store`:** returns all providers ordered by name. Auto-syncs
+any `employee_accounts` row that is a doctor (doctor-workspace role or `is_also_doctor`, DEC-113/114)
+into `providers` if missing (staff callers only; it used to run on every public view). Falls back to
 `data/providers.json` on DB error (empty by default).
 
-**Response:** `ProviderRow[]` — `{ id, name, bookings, services, more, rating, image, phone, email,
+**Response (staff):** `ProviderRow[]` — `{ id, name, bookings, services, more, rating, image, phone, email,
 employmentType, languages, sessionType, active, gender, age, specialty, nationalId,
 workingDaysHours, branchId, startDate, fixedSalary, commissionType, commissionValue,
 commissionBase, commissionFixedComponent, serviceCommissions }`. Note: `email`/`employmentType`/
@@ -799,7 +814,7 @@ Required: `name`, `mobile`. If `id` is present, updates the existing customer. O
 
 Deletes a customer profile record. **Added 2026-09-30 (was missing):** both soft and hard delete
 require `requireSuperadminAccess` — an `admin` is refused (since commit `0976a72`, 2026-09-10; see
-`SECURITY.md` and `RISKS.md` RISK-078). **Changed 2026-10-25 (DEC-132, RISK-138; supersedes DEC-128):** `mode=hard` deletes the patient together with everything that belongs to them, in this order: transactions, invoice payment rows, invoices, product sales, wallet entries, packages, product balances, laser logs, medical records, medical reports, prescriptions, bookings (linked ones, plus un-linked ones that carry the patient's phone and name when no other patient row owns that phone), then the patient row, then the linked Supabase Auth user (by `auth_user_id`, else by e-mail/phone; never a staff login). Answers `200 { message, removed: { bookings, payments, paymentsAmount, packages, walletEntries, productBalances, laserSessions, clinicalRecords }, keptBookingsOtherName }`; `404` when the patient does not exist; `500 { code: "PATIENT_DELETE_FAILED", failedStep, removedSoFar, error }` when a step fails (the patient row is still there, run it again). An id of the form `res-cust-<phone>` (no patient row): `mode=hard` deletes the un-linked bookings with that phone and their transactions/invoices and answers the same `200` shape (`404` if none is left, `409 PATIENT_RECORD_EXISTS` if a patient row now owns the phone); `mode=soft` answers `409 PATIENT_IS_BOOKING_DERIVED` with `blockers.bookings`; `400` for any other non-UUID id. `mode=soft` answers `404` when the patient does not exist.
+`SECURITY.md` and `RISKS.md` RISK-078). **Changed 2026-10-25 (DEC-134, RISK-140; supersedes DEC-128):** `mode=hard` deletes the patient together with everything that belongs to them, in this order: transactions, invoice payment rows, invoices, product sales, wallet entries, packages, product balances, laser logs, medical records, medical reports, prescriptions, bookings (linked ones, plus un-linked ones that carry the patient's phone and name when no other patient row owns that phone), then the patient row, then the linked Supabase Auth user (by `auth_user_id`, else by e-mail/phone; never a staff login). Answers `200 { message, removed: { bookings, payments, paymentsAmount, packages, walletEntries, productBalances, laserSessions, clinicalRecords }, keptBookingsOtherName }`; `404` when the patient does not exist; `500 { code: "PATIENT_DELETE_FAILED", failedStep, removedSoFar, error }` when a step fails (the patient row is still there, run it again). An id of the form `res-cust-<phone>` (no patient row): `mode=hard` deletes the un-linked bookings with that phone and their transactions/invoices and answers the same `200` shape (`404` if none is left, `409 PATIENT_RECORD_EXISTS` if a patient row now owns the phone); `mode=soft` answers `409 PATIENT_IS_BOOKING_DERIVED` with `blockers.bookings`; `400` for any other non-UUID id. `mode=soft` answers `404` when the patient does not exist.
 
 ### GET /api/customers?id={id}&deletePreview=1
 

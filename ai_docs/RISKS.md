@@ -1,6 +1,6 @@
 # RISKS.md — Revera Clinics Risk Register
 
-> **Last Updated:** 2026-10-21 (docs audit: status index and counts rebuilt, seven entries moved to the section that matches their status; RISK-019 closed through RISK-128)
+> **Last Updated:** 2026-10-26 (RISK-140 added; status counts recounted from the sections). 2026-10-21 (docs audit: status index and counts rebuilt, seven entries moved to the section that matches their status; RISK-019 closed through RISK-128)
 > **Previous content was for a different project — discarded entirely**
 > RISK-010 … RISK-020 were found by the 2026-07-25 finance discovery audit and are the
 > remediation scope of `PROPOSALS.md` → PROPOSAL-002 Phase 0.
@@ -14,7 +14,7 @@
 
 ## Status summary
 
-**9 open** · **13 partially resolved** · **106 resolved** · 128 tracked total.
+**9 open** · **13 partially resolved** · **115 resolved** · 137 tracked total. (Counted from the `## RISK-nnn` sections under each heading below on 2026-10-26: 9 + 13 + 115 = 137. The previous line said 106 / 128 and the Resolved index was missing RISK-130, 131 and 132; all three are listed now.)
 Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-partially-resolved) · [Resolved](#-resolved)
 
 ---
@@ -1266,13 +1266,17 @@ filled in with the above.
 - [RISK-127](#risk-127) — The Doctor Portal Briefly Showed Every Doctor's Patients On First Load (RESOLVED, NOT YET CONFIRMED ON PRODUCTION)
 - [RISK-128](#risk-128) — The Public Browser Key Could Read Staff Accounts, Salaries, Attendance, Prescriptions And More — And Write Or Delete Accounts And Roles (RESOLVED ON DEV AND PRODUCTION; PRODUCTION SCREENS NOT YET RE-CHECKED BY THE OWNER)
 - [RISK-129](#risk-129) — Patients Who Paid Showed "Total Spend 0" (RESOLVED, NOT YET CONFIRMED ON PRODUCTION)
-- [RISK-133](#risk-133) — "Hard Delete" Of A Patient Looked Like It Did Nothing: The Patient Came Back From Its Bookings (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION; THE FIX WAS REPLACED BY RISK-135 / DEC-130)
+- [RISK-130](#risk-130) — One Reception Laptop Was Sent To The Login Page At Random: Its Clock Was An Hour Ahead (CAUSE FOUND AND FIXED ON THAT LAPTOP; APP NOW WARNS ABOUT IT)
+- [RISK-131](#risk-131) — Production API Calls To Supabase Stall At Random, So Login And Screens Hang Or Fail (MITIGATED ON DEV; ROOT CAUSE NOT FOUND)
+- [RISK-132](#risk-132) — Total Spend / Outstanding In The Patient Profile Kept Changing Back And Forth (FIXED ON DEV)
+- [RISK-133](#risk-133) — "Hard Delete" Of A Patient Looked Like It Did Nothing: The Patient Came Back From Its Bookings (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
 - [RISK-134](#risk-134) — Every Staff Request Asked The Supabase Auth Server To Check The Login, About 68,000 Auth Requests An Hour, Which Helped Keep The Production Database Unhealthy (RESOLVED ON DEV, NOT YET CONFIRMED ON PRODUCTION)
 - [RISK-135](#risk-135) — Doctors > Attendance Sent The Same Request Over And Over While The Tab Was Open (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER)
 - [RISK-136](#risk-136) — Admin Tabs Polled The Server Around The Clock, Hidden Or Not, And Staff Without Admin Rights Asked For Admin-Only Lists On Every Click (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
 - [RISK-137](#risk-137) — Every Public Page View Cost About 12 API Calls And 15 Database Queries, Nothing Was Cached, And The Booking Popup Loaded Six Reads On Pages That Never Show It (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
 - [RISK-138](#risk-138) — A Patient With Bookings Could Not Be Deleted For Good; The Owner's Rule Is That Permanent Delete Removes Everything (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
 - [RISK-139](#risk-139) — Permanently Deleting A Booking Left Its Payments And Money In The Patient's Figures (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
+- [RISK-140](#risk-140) — Anyone On The Internet Could Read Every Doctor's Phone, Email, National ID And Salary From The Public Doctors Endpoint (RESOLVED ON DEV, NOT YET ON PRODUCTION)
 
 ## RISK-003: Patient Auth Is Non-Functional
 
@@ -5792,7 +5796,7 @@ See `PROPOSALS.md` for:
 
 **Impact now (estimate):** home page 12 calls become 5 (page-settings once, categories, services x2, packages) and, within 60 s of another visitor, those are answered by the CDN without a database query; any other page makes 1 call (page-settings), or 3 on the services page. Opening the booking popup adds 5 more on first open (page-settings reused). Window focus makes none inside 5 minutes.
 
-**New finding, not fixed here (follow-up, owner decision needed):** `GET /api/providers` exposes salary, national id and commission settings to any anonymous caller. Fixing it means sending the staff token from `useProviderForm` and returning a public subset otherwise.
+**New finding, not fixed here (follow-up, owner decision needed):** `GET /api/providers` exposes salary, national id and commission settings to any anonymous caller. Fixing it means sending the staff token from `useProviderForm` and returning a public subset otherwise. **Closed by RISK-140 / DEC-134.**
 
 **Staleness (accepted):** a CMS edit (service, price, category, branch, package, terms, page settings) can take up to 60 s to reach visitors on a fresh page load. With `stale-while-revalidate` the first request after 60 s may still be answered with the old copy while the CDN refreshes (up to 300 s past expiry), and an already-open tab keeps its page-settings copy for up to 5 minutes (zero in the browser that made the save). Staff screens that read these routes WITH a token always get fresh data. Staff screens that read them without a token (for example the New Booking screen's `/api/packages`) can see a copy up to 60 s old after an edit.
 
@@ -5838,3 +5842,33 @@ See `PROPOSALS.md` for:
 2. The wallet is not reversed (the booking row does not hold what wallet credit it used).
 3. The delete is an ordered sequence with undo, not one database transaction. A stalled write (RISK-131) can in theory leave an undo undone; the answer says so (`partial`). A Postgres function would make it atomic.
 4. `product_sales` rows of a previous booking's products are not linked to the booking and stay.
+---
+
+## RISK-140: Anyone On The Internet Could Read Every Doctor's Phone, Email, National ID And Salary From The Public Doctors Endpoint (RESOLVED ON DEV, NOT YET ON PRODUCTION)
+
+**Manual test checklist:** `ai_docs/manual_tests/PROVIDERS_PUBLIC_PROJECTION_MANUAL_TESTS.md`
+
+**Severity:** High (personal data and pay of every doctor, readable without a login) · **Type:** Security / data exposure
+**Found:** 2026-10-25, first noted as a follow-up in RISK-137 and confirmed from the code by the owner's assistant. Status: **RESOLVED ON DEV, NOT YET ON PRODUCTION.** Production still serves the old response until this branch is deployed.
+
+**What was wrong:** `GET /api/providers` had no authentication check and returned the full mapped row of every doctor to any caller: `phone`, `email`, `nationalId`, `fixedSalary`, `commissionType`, `commissionValue`, `commissionBase`, `commissionFixedComponent`, `serviceCommissions`, `age`, `gender`, `startDate`, the whole `workingDaysHours` JSON (which also holds `email`, `employment_type`, `languages`, `session_type`) and the per-doctor `bookings` count. The public booking popup needs only a few of those fields. The admin Doctors screen called it without a token, which is why it had never been locked down.
+
+**It also exposed staff:** every doctor is also an employee, so the salaries and national ids of the doctors on the payroll were visible to anonymous visitors. **Assume the data may already have been collected**: the URL is guessable and was open to scripts, and the app did not record who read it. Whether anyone did cannot be established from the code. Nothing needs to be rotated (no password or key was in the response), but the owner should be told, and the doctors whose national ids and phone numbers were exposed should be told if the clinic's privacy obligations require it. Also check Vercel runtime logs for unusual volume on `/api/providers` if the retention allows.
+
+**Fix:**
+1. `GET /api/providers` decides the caller first. With an `Authorization` header it runs `requireStaffAccess`; a valid staff token gets the full response, byte for byte as before (same fields, same `bookings` counts, same auto-sync). No header, a junk or expired token (401), a valid token of a non-staff user or an inactive staff account (403) all get the public projection, never a 401. If the token check itself fails (500/503) the route answers that error rather than the public list, so a staff screen cannot silently show salaries as 0 and then save them.
+2. `src/lib/publicProvider.ts` is the public projection, an explicit allow-list: `id, name, specialty, image, services, rating, active, branchId, workingDaysHours`. The schedule is rebuilt key by key (branch ids, branch schedules, `in_person` / `online`, per weekday `isOpen`, `start`, `end`, `shifts`), so the `email` / `languages` / `session_type` stored beside it are not sent. A new database column can never reach the public by accident. It is derived from what `BookingModal` reads (`id`, `name`, `services`, `branchId`, `workingDaysHours`) plus `specialty`, `image`, `rating` and `active` for the site.
+3. The anonymous path reads only the `providers` table. The all-reservations count, the `employee_accounts` read and the **employee-to-provider auto-sync** (an INSERT on a public GET) now run for staff callers only. The auto-sync was never needed by the public path: `POST`/`PATCH /api/employees` already create the provider row when a doctor employee is saved. The auto-sync is the safety net for rows that got no provider (for example a role switched to a doctor workspace), and it still runs as soon as any staff member has the admin open, because the admin loads `/api/providers` with a token on start. **Consequence to know about:** such a doctor now becomes bookable on the public site when a staff member next opens the admin, not on the next public page view. The auto-created row has no services and no schedule, so the booking popup treats it as available on any day; creating it from a public page view was itself a risk.
+4. Cache: the anonymous projection uses the public header (`public, s-maxage=60, stale-while-revalidate=300`, `Vary: Authorization`, same helper as services and categories); any request with an `Authorization` header, staff included, is `private, no-store`. The local-JSON fallback and error bodies are never shared-cacheable, and the fallback goes through the same allow-list.
+5. `useProviderForm.fetchProviders` (the only staff caller) now sends the bearer token, read with `getAuthHeaders()` when the call runs. It must not use the `authenticatedJsonHeaders` prop: the mount effect calls `fetchProviders` before the session state is filled, so that closure holds `Bearer ` with no token and would get the public list.
+
+**Public callers (unchanged, they send no token):** `BookingModal` (`src/components/BookingModal.tsx`, mounted globally and on `/book`). No other `src/` caller of `GET /api/providers` exists; the admin New Booking screen reads `providers` through the browser Supabase client instead (see SECURITY.md section 6).
+
+**Not fixed / still open:**
+- Any staff account (reception included) still receives the full response, salaries too. This change separates staff from the public, not staff roles from each other. Narrowing by permission is a product decision.
+- `AdminNewBookingView` reads `providers` straight from Supabase with the browser key. Whether an anonymous holder of that key can read the table depends on RLS on production, which was not checked here. RISK-136 notes it returned empty on the test database.
+- `scratch/doctor-view-tests.mjs` and `scratch/test-apis.mjs` call the endpoint anonymously; they only count rows or print status and are unaffected.
+
+**Tests:** `tests/routes/providers-public-projection.test.ts` (exact key set, no secret strings anywhere in the JSON including nested schedule fields, junk / empty / expired / patient / inactive-staff tokens get the projection, staff gets the full response with bookings counts, auto-sync still inserts for staff and never for anonymous, anonymous reads only the `providers` table, 503 is not degraded, a new column does not leak), `tests/components/doctor/useProviderFormToken.test.tsx` (the Doctors list fetch carries the Authorization header even while the `session` prop is null). `tests/routes/public-read-caching.test.ts` was changed: its providers block asserted the leak (an anonymous call returned `fixedSalary` and `nationalId` with no cache header); it now asserts the projection, the public header for anonymous callers, and `private, no-store` plus the unchanged full row for staff.
+
+**Still to do:** run the manual checklist in the browser (anonymous curl, and the Doctors screen as staff), deploy, then repeat the anonymous curl against production and confirm no salary or national id comes back. Tell the owner about the exposure window.

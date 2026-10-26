@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Branch } from "@/types";
 import { ServiceCommissionEntry } from "@/components/admin/services/DoctorServiceCommissionEditor";
 import { clearFetchCache } from "@/lib/fetchCache";
+import { getAuthHeaders } from "@/lib/authHeaders";
 
 interface UseProviderFormParams {
   branches: Branch[];
@@ -198,7 +199,12 @@ export function useProviderForm({
   // ── fetchProviders ──
   function fetchProviders() {
     clearFetchCache("/api/providers");
-    fetch("/api/providers")
+    // RISK-140: the list carries salaries, national ids and commission settings, which the server
+    // only sends to a valid staff token (anyone else gets the public projection). The token is read
+    // at call time rather than from `authenticatedJsonHeaders`, because the first call runs from the
+    // mount effect, whose closure was built before the session state was filled in.
+    getAuthHeaders()
+      .then((headers) => fetch("/api/providers", { headers }))
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) {

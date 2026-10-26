@@ -34,7 +34,7 @@
 ## Response headers (Vercel preview, DevTools > Network > a request > Response headers)
 - [ ] Anonymous `GET /api/services`, `/api/categories`, `/api/branches`, `/api/packages`, `/api/terms?active_only=true`, `/api/page-settings`: `Cache-Control: public, s-maxage=60, stale-while-revalidate=300` and `Vary: Authorization`. A second request inside a minute shows `x-vercel-cache: HIT`.
 - [ ] Same URLs with `curl -H "Authorization: Bearer junk"`: `Cache-Control: private, no-store`, never `public`.
-- [ ] `GET /api/providers` and `GET /api/availability?...`: no `public` / `s-maxage` header.
+- [ ] `GET /api/availability?...`: no `public` / `s-maxage` header. (`GET /api/providers` changed in RISK-140: the anonymous public projection is cacheable, anything with an `Authorization` header is not; see `PROVIDERS_PUBLIC_PROJECTION_MANUAL_TESTS.md`.)
 - [ ] A failing response (for example switch the database off on a preview, or request `/api/terms` while the table errors) has no public cache header.
 
 ## Staff-login freshness (must show fresh data)

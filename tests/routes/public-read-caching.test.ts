@@ -7,7 +7,8 @@
  *  - a GET that carries ANY Authorization header (valid staff token, junk token) never gets a
  *    public header — it is `private, no-store`;
  *  - error and fallback bodies are never shared-cacheable;
- *  - GET /api/providers stays uncached (it carries staff-only fields) and its JSON is unchanged;
+ *  - GET /api/providers (RISK-140): anonymous = public projection (may use the public header); any
+ *    request with an Authorization header, staff included, is private, no-store;
  *  - the JSON bodies are exactly what they were before the headers were added.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -181,8 +182,31 @@ describe('error and fallback responses are not shared-cacheable', () => {
   });
 });
 
-describe('GET /api/providers stays out of the shared cache', () => {
-  it('carries no public cache header (staff-only fields, read by staff without a token)', async () => {
+// RISK-140 changed this block: it used to assert that an anonymous GET returns the staff-only
+// fields (fixedSalary, nationalId) and carries no public header. The anonymous response is now the
+// allow-listed public projection (and may use the public header); the staff response stays
+// uncached. Full coverage: tests/routes/providers-public-projection.test.ts.
+describe('GET /api/providers cache headers (RISK-140)', () => {
+  it('anonymous: public projection with the shared-cache header; staff-only fields are gone', async () => {
+    fake.seed('providers', [
+      { id: 'pr1', name: 'Dr A', services: [], rating: 5, fixed_salary: 9000, national_id: '123', active: true },
+    ]);
+    fake.seed('reservations', []);
+    fake.seed('roles', []);
+    fake.seed('employee_accounts', []);
+    const res = await providersGET(get('/api/providers'));
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Cache-Control')).toBe(PUBLIC);
+    expect(res.headers.get('Vary')).toBe('Authorization');
+    const body = await res.json();
+    expect(body).toHaveLength(1);
+    expect(body[0]).toMatchObject({ id: 'pr1', name: 'Dr A' });
+    expect(body[0]).not.toHaveProperty('fixedSalary');
+    expect(body[0]).not.toHaveProperty('nationalId');
+  });
+
+  it('staff: carries no public cache header, response shape and per-doctor count unchanged', async () => {
+    seedAdminAuth();
     fake.seed('providers', [
       { id: 'pr1', name: 'Dr A', services: [], rating: 5, fixed_salary: 9000, national_id: '123', active: true },
     ]);
@@ -191,16 +215,27 @@ describe('GET /api/providers stays out of the shared cache', () => {
       { doctor_name: 'dr a', status: 'completed' },
       { doctor_name: 'Dr A', status: 'rejected' },
     ]);
-    fake.seed('roles', []);
-    fake.seed('employee_accounts', []);
+    const res = await providersGET(get('/api/providers', 'Bearer staff-token'));
+    expect(res.status).toBe(200);
+    const cc = res.headers.get('Cache-Control') || '';
+    expect(cc).toBe('private, no-store');
+    expect(cc).not.toContain('s-maxage');
+    const body = await res.json();
+    expect(body).toHaveLength(1);
+    expect(body[0]).toMatchObject({ id: 'pr1', name: 'Dr A', bookings: 2, fixedSalary: 9000, nationalId: '123' });
+  });
+
+  it('a call with no request object gets the public projection but is never shared-cacheable', async () => {
+    fake.seed('providers', [
+      { id: 'pr1', name: 'Dr A', services: [], rating: 5, fixed_salary: 9000, national_id: '123', active: true },
+    ]);
     const res = await providersGET();
     expect(res.status).toBe(200);
     const cc = res.headers.get('Cache-Control') || '';
     expect(cc).not.toContain('public');
     expect(cc).not.toContain('s-maxage');
     const body = await res.json();
-    expect(body).toHaveLength(1);
-    // public/staff response shape and the per-doctor count are unchanged
-    expect(body[0]).toMatchObject({ id: 'pr1', name: 'Dr A', bookings: 2, fixedSalary: 9000, nationalId: '123' });
+    expect(body[0]).not.toHaveProperty('fixedSalary');
+    expect(body[0]).not.toHaveProperty('nationalId');
   });
 });

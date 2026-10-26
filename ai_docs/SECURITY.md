@@ -1,6 +1,6 @@
 # SECURITY.md — Current Security Posture
 
-> **Last Updated:** 2026-10-21. Full re-audit against `dev`: §2 and §3 rebuilt from a scan of every route
+> **Last Updated:** 2026-10-26 (§3a and §6: `GET /api/providers` is dual-mode, RISK-140 / DEC-134). 2026-10-21: full re-audit against `dev`: §2 and §3 rebuilt from a scan of every route
 > handler (the HR gap listed here until now had been closed since 2026-08-16), §4 records that the RISK-128
 > migration is applied on dev and production.
 > **Audited from:** `src/middleware.ts`, `src/lib/access.ts`, every `src/app/api/**/route.ts`,
@@ -119,7 +119,8 @@ Re-run the scan after adding a route (see §7).
 | Route | Methods | Why |
 |---|---|---|
 | `availability` | GET | The public booking widget needs slot availability with no login. |
-| `branches`, `categories`, `services`, `providers`, `rooms`, `service-rooms`, `packages`, `terms` | GET | Catalog and clinic information the public site and the booking flow read. `packages` returns the whole catalog (including inactive and not-on-website packages) and `providers` returns the full provider row; nothing secret, but wider than the site strictly needs. **Shared cache (RISK-137 / DEC-131):** the successful anonymous GET of `branches`, `categories`, `services`, `packages` and `terms` carries `Cache-Control: public, s-maxage=60, stale-while-revalidate=300` + `Vary: Authorization`; a request with any `Authorization` header gets `private, no-store`. `providers`, `availability`, `rooms` and `service-rooms` are not cached. **Open finding:** `providers` returns `fixedSalary`, `nationalId` and `commission*` to anonymous callers (the admin Doctors screen reads it without a token), which is why it is kept out of the shared cache; closing it needs a staff token on that screen and a public subset (RISK-137). |
+| `branches`, `categories`, `services`, `rooms`, `service-rooms`, `packages`, `terms` | GET | Catalog and clinic information the public site and the booking flow read. `packages` returns the whole catalog (including inactive and not-on-website packages); nothing secret, but wider than the site strictly needs. **Shared cache (RISK-137 / DEC-131):** the successful anonymous GET of `branches`, `categories`, `services`, `packages` and `terms` carries `Cache-Control: public, s-maxage=60, stale-while-revalidate=300` + `Vary: Authorization`; a request with any `Authorization` header gets `private, no-store`. `availability`, `rooms` and `service-rooms` are not cached. |
+| `providers` | GET | **Dual-mode since RISK-140 / DEC-134.** A valid staff bearer token gets the full response (`phone`, `email`, `nationalId`, `fixedSalary`, `commission*`, `serviceCommissions`, `bookings`, ...). Everyone else (no `Authorization` header, a junk or expired token, a valid token of a non-staff user, an inactive staff account) gets the explicit allow-list from `src/lib/publicProvider.ts`: `id, name, specialty, image, services, rating, active, branchId, workingDaysHours` (the schedule rebuilt key by key, so the `email` / `languages` stashed in that JSON column are not sent). Before RISK-140 this route returned every doctor's phone, email, national id and salary to any visitor. Only the anonymous projection uses the 60 s shared-cache header; any request with an `Authorization` header is `private, no-store`. If the staff token check itself fails (500/503) the route answers that error instead of the public list. The employee-to-provider auto-sync (a DB write) and the reservation counts run for staff callers only. |
 | `customer-avatars` | GET | Avatar URL map keyed by patient id; no names. POST is `requireStaffAccess`. |
 | `provider-attendance` | GET | Returns the day's provider check-in/out rows to anyone who passes `?date=`. **Not documented as intentional anywhere before this audit** (see §6). POST is `requireStaffAccess`. |
 | `page-settings` | GET | Dual-mode: staff get the full blob, everyone else gets `stripInternalFields()`'d public CMS content (RISK-067). Only the stripped anonymous body of a database read is sent with the 60 s shared-cache header; any request carrying `Authorization` (staff blob included) is `private, no-store` (RISK-137). |
@@ -253,9 +254,12 @@ routes authenticate with a shared secret (`requireBotSecret`), not a user token;
   `requireOwnIdentity`-style helper generalized beyond `/api/customers` would close this class of
   bug at the root instead of per-route.
 - **Public reads that were never decided on (found in the 2026-10-21 audit, not yet logged as a RISK):**
-  `GET /api/provider-attendance?date=` returns each provider's check-in / check-out rows to anyone, and `GET /api/packages` and
-  `GET /api/providers` return full rows including fields the public site does not render. None is PHI. Decide whether each is
+  `GET /api/provider-attendance?date=` returns each provider's check-in / check-out rows to anyone, and `GET /api/packages`
+  returns full rows including fields the public site does not render. None is PHI. Decide whether each is
   meant to be public; if not, gate it with `requireStaffAccess` and add a public-safe projection for the site.
+  (`GET /api/providers` was in this list and was NOT harmless: it exposed salaries and national ids. Closed by RISK-140 / DEC-134 with a public projection.)
+- **Any staff account still gets the full `GET /api/providers` response** (salaries, national ids, commission settings), whatever its role or permissions: RISK-140 separates staff from the public, not staff roles from each other. Narrowing it by permission (for example `providers.view` / `finance.*`) is a follow-up product decision.
+- **Supabase tables read with the browser (anon) key:** `AdminNewBookingView` reads `providers` directly with `supabase.from("providers").select("*")`. Whether that returns rows to an anonymous holder of the public key depends on RLS for `providers` (RISK-136 records that the same direct read returned empty arrays on the test database because of RLS; production was not checked). Verify RLS on `providers` on production; the API fix does not cover a direct PostgREST read.
 - **GPS attendance spoofing (RISK-006):** server validates coordinate bounds/accuracy and binds the
   check-in to the authenticated employee, but cannot detect a spoofed-but-plausible location. Open;
   would need signed/attested check-in tokens to fully close.

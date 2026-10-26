@@ -1,6 +1,6 @@
 # DECISIONS.md — Revera Clinics Decision Log
 
-> **Last Updated:** 2026-10-21 (docs audit: duplicate DEC-025 heading renamed, migration-status lines of DEC-088/110/111/113/114/117 brought up to date; the highest number in use is DEC-122)
+> **Last Updated:** 2026-10-21 (docs audit: duplicate DEC-025 heading renamed, migration-status lines of DEC-088/110/111/113/114/117 brought up to date; the highest number in use is DEC-122). 2026-10-26: DEC-134 added (highest number in use is now DEC-134)
 > **Previous content was for a different project — discarded entirely**
 > **Rule:** Before changing any decision recorded here, read the full entry first.
 
@@ -4024,6 +4024,8 @@ A patient that exists only in the list because of bookings (`res-cust-<phone>`, 
 
 **Tests:** `tests/routes/public-read-caching.test.ts`, `tests/components/BookingModalLazyLoad.test.tsx`, `tests/components/publicPageSettings.test.tsx`. Manual checklist: `ai_docs/manual_tests/PUBLIC_READ_CACHING_MANUAL_TESTS.md`.
 
+*Update 2026-10-26: item 3 above (`providers` not cached) is superseded by DEC-134. The anonymous public projection of `providers` now uses the same shared cache; the full staff response stays `private, no-store`.*
+
 ## DEC-132: Permanent Delete Of A Patient Deletes Everything That Belongs To Them (Supersedes DEC-128); The Superadmin Sees The Counts First
 
 **Date:** 2026-10-25 · **Status:** Done on dev (branch `fix/patient-hard-delete-everything`); not yet on production · **Supersedes:** DEC-128 · **Related:** RISK-138, RISK-133, DEC-074 (reservation-derived patients), PRODUCT_RULES "Deletion Rules"
@@ -4078,3 +4080,28 @@ A failure in steps 2 to 5 undoes the earlier steps (figures restored, sessions t
 - A manual transaction that was created through the API with a `reservation_id` also moved the totals itself; the screens never send that field, so it is not reversed separately.
 
 **Tests:** `tests/routes/reservations-hard-delete-cascade.test.ts` (23 cases, 18 of which failed before the change), `tests/lib/bookingDeletion.test.ts`. Manual checklist: `ai_docs/manual_tests/BOOKING_HARD_DELETE_CASCADE_MANUAL_TESTS.md`.
+---
+
+## DEC-134: The Doctors Endpoint Has Two Answers: A Small Public Projection For Everyone, The Full Record Only For A Valid Staff Token
+
+**Date:** 2026-10-26 · **Status:** Done on dev (branch `fix/providers-public-projection`); not yet on production · **Related:** RISK-140, RISK-137, DEC-131, DEC-129
+
+**Decision:**
+1. `GET /api/providers` returns the full response (unchanged shape, including `bookings`) only when the request carries a valid staff bearer token (`requireStaffAccess`). Every other caller gets the public projection: no header, a junk or expired token, a valid token of a non-staff user, or an inactive staff account. These are never answered with 401, so the public site cannot break.
+2. The public projection is an **allow-list** in `src/lib/publicProvider.ts`: `id, name, specialty, image, services, rating, active, branchId, workingDaysHours`, with the schedule rebuilt key by key. Not "the full row minus secrets": a new column must not become public by default.
+3. When the token check itself fails (500/503) the route returns that error. A reduced list is never substituted for a staff request, because the Doctors screen would show salaries as 0 and an edit could save that.
+4. The public path reads only `providers`. The reservation counts, the `employee_accounts` read and the employee-to-provider auto-sync (a write) are staff-only. The anonymous projection uses the 60-second shared cache of DEC-131; anything with an `Authorization` header is `private, no-store`.
+5. The one staff caller, `useProviderForm.fetchProviders`, sends the token read at call time (`getAuthHeaders()`).
+
+**Why:** the endpoint exposed salaries, national ids, phones, emails and commission settings of every doctor to anyone. The public booking popup needs a handful of fields. Splitting by token keeps every staff screen exactly as it was and costs the public path one table read.
+
+**Rejected:**
+- Requiring a token on the whole route (`401` for anonymous): breaks the public booking popup.
+- A deny-list (copy the row, delete phone, salary, ...): the next column added would leak by default.
+- A second route (`/api/providers/public`) for the site: two URLs to keep in step and the leaking URL would still need locking.
+- Gating the full response by a permission such as `providers.view`: not requested, would change what reception sees today. Recorded as a follow-up in RISK-140.
+- Falling back to the public projection when the token check returns 500/503: see decision 3.
+
+**Accepted cost:** a doctor employee that has no `providers` row (for example after a role is switched to a doctor workspace) now gets one when a staff member next opens the admin, not on the next public page view. `POST`/`PATCH /api/employees` create the row immediately, so this affects only that rare path.
+
+**Tests:** `tests/routes/providers-public-projection.test.ts`, `tests/components/doctor/useProviderFormToken.test.tsx`, `tests/routes/public-read-caching.test.ts`. Manual checklist: `ai_docs/manual_tests/PROVIDERS_PUBLIC_PROJECTION_MANUAL_TESTS.md`.
