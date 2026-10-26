@@ -156,7 +156,15 @@ export async function resolveHistoricalPackages(
       .from('packages')
       .select('id, name, name_ar, price, validity_days, package_type, total_pulses')
       .in('id', catalogIds);
-    if (error) return { ok: false, error: `Could not load packages: ${error.message}` };
+    // 22P02 = a packageId that is not a valid uuid (e.g. a client-side placeholder that never
+    // resolved to a real catalog package) — same friendly message as the customerPackageId case
+    // above instead of a raw Postgres error.
+    if (error) {
+      return {
+        ok: false,
+        error: (error as any).code === '22P02' ? 'A selected package does not exist in the catalog.' : `Could not load packages: ${error.message}`,
+      };
+    }
     for (const row of data || []) recordById.set(String(row.id), row);
   }
 

@@ -15,6 +15,7 @@ import {
   Save,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   Loader2,
   ChevronDown,
   Clock,
@@ -962,7 +963,12 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
         parsedPkgs.push({
           id: `edit-pkg-${idx}-${Date.now()}`,
           source: foundCp ? "existing" : "catalog",
-          packageId: String(foundCp?.packageId || foundPkg?.id || `pkg-${idx}`),
+          // Empty, never a fabricated id like `pkg-${idx}` — that is not a real uuid, and sending
+          // it on save made PATCH /api/reservations/previous crash with a raw Postgres
+          // "invalid input syntax for type uuid" error instead of a clean message. An unmatched
+          // name (package renamed/deleted since this booking was recorded) is filtered out of the
+          // save payload below; the empty id is what that filter checks for.
+          packageId: String(foundCp?.packageId || foundPkg?.id || ""),
           customerPackageId: foundCp ? String(foundCp.id) : undefined,
           name: namePart || `Package #${idx + 1}`,
           nameAr: foundPkg?.nameAr || foundCp?.packageNameAr,
@@ -1086,7 +1092,11 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
       const parsedInvoiceVal = invoiceValue !== "" ? parseFloat(invoiceValue) : 0;
       const parsedSpentVal = actualSpent !== "" ? parseFloat(actualSpent) : 0;
 
-      const firstPkg = attachedPackages[0];
+      // A package parsed from an older booking's notes that could not be matched to any catalog
+      // or patient package (name changed/deleted since) has no real id — drop it here rather than
+      // sending a value the server would reject as an invalid package id.
+      const validAttachedPackages = attachedPackages.filter((p) => p.customerPackageId || p.packageId);
+      const firstPkg = validAttachedPackages[0];
       const fullFormattedPhone = formatFullPhone(trimmedPhone, countryCode);
 
       const payload: Record<string, any> = {
@@ -1118,7 +1128,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
         packagePulsesTotal: firstPkg?.packageType === "pulses" ? firstPkg.totalPulses : null,
         packagePulsesUsed: firstPkg?.packageType === "pulses" ? (Number(firstPkg.pulsesUsed) || 0) : null,
         packagePulsesRemaining: firstPkg?.packageType === "pulses" ? (Number(firstPkg.pulsesRemaining) || 0) : null,
-        packages: attachedPackages.map((pkg) => ({
+        packages: validAttachedPackages.map((pkg) => ({
           packageId: pkg.packageId,
           packageName: pkg.name,
           customerPackageId: pkg.customerPackageId || null,
@@ -1905,6 +1915,16 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
                   key={pkg.id}
                   className="rounded-2xl border border-[var(--cr-primary)]/20 bg-gradient-to-br from-[#F4F7F2] via-white to-[#EBF3E7] p-4 sm:p-5 shadow-xs space-y-4 transition-all"
                 >
+                  {!pkg.packageId && !pkg.customerPackageId && (
+                    <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-800">
+                      <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+                      <span>
+                        {lang === "ar"
+                          ? "الباقة دي كانت مسجلة في الحجز القديم لكن مش موجودة في الكتالوج دلوقتي (اتغير اسمها أو اتحذفت). مش هتتحفظ مع التعديل ده — شيلها لو مش محتاجها، أو اختار الباقة الصح من القائمة."
+                          : "This package was recorded on the original booking but no longer matches a catalog or patient package (renamed or deleted). It will not be saved with this edit — remove it, or re-select the correct package below."}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--cr-primary)]/10 pb-3">
                     <div className="flex items-center gap-2.5">
                       <div className="p-2 rounded-xl bg-[var(--cr-primary)] text-white shadow-xs">
