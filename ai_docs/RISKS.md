@@ -5872,3 +5872,29 @@ See `PROPOSALS.md` for:
 **Tests:** `tests/routes/providers-public-projection.test.ts` (exact key set, no secret strings anywhere in the JSON including nested schedule fields, junk / empty / expired / patient / inactive-staff tokens get the projection, staff gets the full response with bookings counts, auto-sync still inserts for staff and never for anonymous, anonymous reads only the `providers` table, 503 is not degraded, a new column does not leak), `tests/components/doctor/useProviderFormToken.test.tsx` (the Doctors list fetch carries the Authorization header even while the `session` prop is null). `tests/routes/public-read-caching.test.ts` was changed: its providers block asserted the leak (an anonymous call returned `fixedSalary` and `nationalId` with no cache header); it now asserts the projection, the public header for anonymous callers, and `private, no-store` plus the unchanged full row for staff.
 
 **Still to do:** run the manual checklist in the browser (anonymous curl, and the Doctors screen as staff), deploy, then repeat the anonymous curl against production and confirm no salary or national id comes back. Tell the owner about the exposure window.
+
+## RISK-141: Historical-Booking Packages Were Reconstructed From `notes` Text Instead Of A Real Id (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER; MIGRATION UNAPPLIED)
+
+**Manual test checklist:** `ai_docs/manual_tests/RISK_141_PACKAGE_REAL_ID_MANUAL_TESTS.md`
+
+**Severity:** Medium (one user-facing crash + a wrong-data class identical to RISK-038/057) · **Type:** Data integrity / schema
+**Found:** 2026-10-25, owner report: Edit Previous Booking on a package booking failed with `Could not load packages: invalid input syntax for type uuid: "pkg-0"`. Same defect class RISK-038 and RISK-057 already fixed for products — there, three independent regex parsers reconstructed the same fact from free text; here the Edit form parsed `Package: <name>` out of `reservations.notes` and fuzzy-matched the name against the catalog and the patient's packages.
+
+**Causes found:**
+1. `reservation_products` had no `package_id`/`customer_package_id` columns — POST wrote `description: 'Package: <name>'` and dropped the real ids.
+2. `PATCH /api/reservations/previous` never wrote `reservation_products` at all.
+3. The Edit form reconstructed attached packages by regex-parsing `notes` and name-matching; an unmatched name (renamed/deleted package) fabricated `pkg-<n>` and sent it as a real `packageId`, crashing on Postgres `22P02` — surfaced verbatim to the user.
+
+**Fix (Brief 37, branch `feat/brief-37-package-id`; stopgap also cherry-picked to `dev` directly):**
+- **Part D (on `dev`, `9a99e34`):** cherry-picked `0c17d2a` — no fabricated id, unmatched packages filtered out of the save with a warning card, and `22P02` on the catalog lookup gets the same friendly message the `customer_packages` branch already had. Crash gone immediately.
+- **Part A (migration `20261026000000…`, UNAPPLIED — owner applies):** `package_id uuid → packages(id)` and `customer_package_id uuid → customer_packages(id)`, both `ON DELETE SET NULL`, on `reservation_products`. `DB_SCHEMA.md` updated in the same commit.
+- **Part B:** POST step 7c writes both ids; new PATCH step 10a syncs package lines — deletes `line_type='additional_service'` rows with `package_id` set *and* legacy `description ILIKE 'Package:%'` rows (prevents duplicates when editing a pre-migration booking), then re-inserts one line per attached package. Non-fatal warnings, same as POST.
+- **Part C:** `mapReservationProduct()` exposes `packageId`/`customerPackageId`; `AdminAddPreviousBookingView` builds attached packages from those ids when present (catalog name/lookup by id — a renamed package shows its current name), notes-regex demoted to fallback only for pre-migration rows.
+
+**Tests:** extended `tests/routes/reservations-previous-package.test.ts` (+2) and `reservations-previous-edit.test.ts` (+2); 35/35 in those files. `tsc` clean; eslint 0 new errors (4 pre-existing `prefer-const`, 2 pre-existing render-purity errors on dev unchanged).
+
+**Not done / still open:**
+- Migration `20261026000000…` is **unapplied** — Part B/C's new columns no-op until the owner applies it; the notes fallback covers reads until then, and writes carry NULL ids (same as today).
+- Identical gap for **products** (Edit checks `product_ids`/`productIds`/`.products` but the API field is `attachedProducts`, so products also fall through to notes-regex 100% of the time) and for **products/services sync on PATCH** — reported to Mohamed, needs its own brief (wider blast radius, per the brief's out-of-scope).
+- POST step 7a writes `line_type: 'service'` for the primary service — rejected by the CHECK constraint (`product`/`additional_service`/`device_pulses` only) and swallowed by the unchecked `await`; primary-service line rows are likely never written. Reported, not fixed.
+- No backfill of pre-migration rows — they stay `NULL`, the notes fallback covers display. No browser verification yet.

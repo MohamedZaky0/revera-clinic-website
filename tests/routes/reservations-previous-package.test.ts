@@ -319,3 +319,23 @@ describe('RISK-106: pulses used before launch stay in the package_pulse_usage au
     expect(rows('package_pulse_usage')).toHaveLength(0);
   });
 });
+
+describe('RISK-138 / Brief 37: reservation_products carries the real package ids', () => {
+  it('a catalog package line stores package_id with customer_package_id null', async () => {
+    await POST(staffPost(body({ packageId: 'pulses-10k', invoiceValue: 4000, actualSpent: 4000 })));
+    const line = rows('reservation_products').find((r) => String(r.description || '').startsWith('Package:'));
+    expect(line).toBeTruthy();
+    expect(line.package_id).toBe('pulses-10k');
+    expect(line.customer_package_id).toBeNull();
+  });
+
+  it('an existing patient package line stores both package_id and customer_package_id', async () => {
+    await POST(staffPost(body({ packageId: 'pulses-10k', invoiceValue: 8000, actualSpent: 8000 })));
+    const cpId = rows('customer_packages')[0].id;
+
+    await POST(staffPost(body({ customerPackageId: cpId, packageId: 'pulses-10k' })));
+    const lines = rows('reservation_products').filter((r) => String(r.description || '').startsWith('Package:'));
+    expect(lines).toHaveLength(2);
+    expect(lines[1]).toMatchObject({ package_id: 'pulses-10k', customer_package_id: cpId });
+  });
+});

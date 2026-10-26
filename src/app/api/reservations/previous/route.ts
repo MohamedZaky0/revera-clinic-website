@@ -557,6 +557,8 @@ export async function POST(req: Request) {
       const { error: rpErr } = await supabaseServer.from('reservation_products').insert({
         reservation_id: newReservation.id,
         line_type: 'additional_service',
+        package_id: p.packageId || null,
+        customer_package_id: p.customerPackageId || null,
         description: `Package: ${p.packageName}`,
         qty: 1,
         unit_price: linePrice,
@@ -936,6 +938,53 @@ export async function PATCH(req: Request) {
         if (outcome.error) warnings.push(`Package ${pkg.packageName}: ${outcome.error}`);
         if (outcome.pulseUsageSyncError) warnings.push(`Package ${pkg.packageName} pulse history: ${outcome.pulseUsageSyncError}`);
       }
+    }
+
+    // 10a. Sync the booking's package line items (Brief 37 / RISK-138): the real
+    // package_id/customer_package_id link replaces notes-text reconstruction on
+    // the read side. Two deletes: id-linked package rows, and legacy 'Package:
+    // <name>' text rows written before the id columns existed — without the
+    // second delete an edited pre-migration booking would gain duplicate package
+    // lines. Product, service and live doctor-session lines are never touched
+    // (this endpoint only handles is_historical bookings anyway). Then one fresh
+    // line per currently attached package, same shape as the POST write.
+    // Non-fatal: a sync problem shows as a warning, never blocks the edit.
+    try {
+      const patchStaffEmployeeId = (access as any).access?.employee?.id || null;
+      const { error: delPkgErr } = await supabaseServer
+        .from('reservation_products')
+        .delete()
+        .eq('reservation_id', id)
+        .eq('line_type', 'additional_service')
+        .not('package_id', 'is', null);
+      const { error: delLegacyErr } = await supabaseServer
+        .from('reservation_products')
+        .delete()
+        .eq('reservation_id', id)
+        .eq('line_type', 'additional_service')
+        .ilike('description', 'Package:%');
+      if (delPkgErr || delLegacyErr) {
+        warnings.push(`Could not clear previous package lines: ${(delPkgErr || delLegacyErr)?.message}`);
+      } else {
+        for (const p of incomingPackages) {
+          const linePrice = p.customerPackageId ? 0 : (p.clientPrice || Number(p.record?.price || 0));
+          const { error: rpErr } = await supabaseServer.from('reservation_products').insert({
+            reservation_id: id,
+            line_type: 'additional_service',
+            package_id: p.packageId || null,
+            customer_package_id: p.customerPackageId || null,
+            description: `Package: ${p.packageName}`,
+            qty: 1,
+            unit_price: linePrice,
+            total: linePrice,
+            added_by_employee_id: patchStaffEmployeeId,
+            added_by_role: 'receptionist'
+          });
+          if (rpErr) warnings.push(`Could not record package line for ${p.packageName}: ${rpErr.message}`);
+        }
+      }
+    } catch (pkgSyncErr: any) {
+      warnings.push(`Package line sync failed: ${pkgSyncErr?.message}`);
     }
 
     // 11. Customer balances (non-fatal errors)

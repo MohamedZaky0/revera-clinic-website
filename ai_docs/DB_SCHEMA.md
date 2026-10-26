@@ -1186,6 +1186,8 @@ reconstructing the same fact from that text, none matching the doctor portal's a
 | `line_type` | text | CHECK IN (`'product'`, `'additional_service'`, `'device_pulses'`) |
 | `product_id` | text | FK → inventory_products.id ON DELETE SET NULL, nullable — set for `product` rows |
 | `service_id` | bigint | FK → services.id ON DELETE SET NULL, nullable — set for `additional_service` rows |
+| `package_id` | UUID | FK → packages.id ON DELETE SET NULL, nullable — catalog package this line represents. **Added 2026-10-26** (Brief 37 / RISK-138): real id link replacing `Package: <name>` text in `reservations.notes`; rows written before this migration stay `NULL` and are reconstructed by the notes fallback on read |
+| `customer_package_id` | UUID | FK → customer_packages.id ON DELETE SET NULL, nullable — the patient's purchased package instance this line draws from, when the booking redeemed an existing package rather than selling a catalog one |
 | `description` | text | NOT NULL — human-readable line description; carries device/pulse detail for `device_pulses` rows (no `inventory_devices` FK on this table) |
 | `qty` | numeric | Default 1 |
 | `unit_price` | numeric | Default 0 |

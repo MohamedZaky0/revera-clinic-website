@@ -420,4 +420,47 @@ describe('PATCH /api/reservations/previous (edit historical booking)', () => {
     const audit = rows('transaction_audit_logs')[0];
     expect(audit.transaction_id).toBe(payments[0].id);
   });
+
+  it('14. RISK-138: PATCH rewrites package lines with real ids — id-linked and legacy text rows cleared, other line types untouched', async () => {
+    const createRes = await POST(staffPost(body({ serviceId: 15, packageId: 'pkg-1', invoiceValue: 3000, actualSpent: 3000 })));
+    expect(createRes.status).toBe(200);
+    const resId = (await createRes.json()).booking.id;
+
+    // Simulate a pre-migration leftover: a text-only package line with no id columns,
+    // plus a non-package line that must survive the sync.
+    fake.db.reservation_products.push(
+      { id: 'legacy-pkg-line', reservation_id: resId, line_type: 'additional_service', package_id: null, customer_package_id: null, description: 'Package: Laser 6 Sessions', qty: 1, unit_price: 3000, total: 3000 },
+      { id: 'prod-line', reservation_id: resId, line_type: 'product', description: 'Serum', qty: 1, unit_price: 100, total: 100 }
+    );
+
+    const patchRes = await PATCH(staffPatch({
+      id: resId,
+      invoiceValue: 3000,
+      actualSpent: 3000,
+      packages: [{ packageId: 'pkg-1', packageName: 'Laser 6 Sessions' }]
+    }));
+    expect(patchRes.status).toBe(200);
+
+    const pkgLines = rows('reservation_products').filter(
+      (r) => r.reservation_id === resId && String(r.description || '').startsWith('Package:')
+    );
+    expect(pkgLines).toHaveLength(1);
+    expect(pkgLines[0].id).not.toBe('legacy-pkg-line');
+    expect(pkgLines[0]).toMatchObject({ package_id: 'pkg-1', customer_package_id: null });
+
+    expect(rows('reservation_products').find((r) => r.id === 'prod-line')).toBeTruthy();
+  });
+
+  it('15. RISK-138: removing the package on edit clears the package line entirely', async () => {
+    const createRes = await POST(staffPost(body({ packageId: 'pkg-1', invoiceValue: 3000, actualSpent: 3000 })));
+    const resId = (await createRes.json()).booking.id;
+    expect(rows('reservation_products').filter((r) => String(r.description || '').startsWith('Package:'))).toHaveLength(1);
+
+    const patchRes = await PATCH(staffPatch({ id: resId, invoiceValue: 1000, actualSpent: 1000, packages: [] }));
+    expect(patchRes.status).toBe(200);
+
+    expect(rows('reservation_products').filter(
+      (r) => r.reservation_id === resId && String(r.description || '').startsWith('Package:')
+    )).toHaveLength(0);
+  });
 });
