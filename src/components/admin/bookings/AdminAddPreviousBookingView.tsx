@@ -937,8 +937,67 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
       setSelectedProducts(matchedInitialProds);
     }
 
-    // Multi-package extraction from historical notes
+    // Multi-package extraction — Brief 37 / RISK-138. Preferred source:
+    // reservation_products rows carrying real package_id / customer_package_id
+    // (exposed on attachedProducts by GET /api/reservations). No notes parsing
+    // involved — a package renamed in the catalog still resolves by id and shows
+    // its CURRENT name. The notes-regex block below stays as the fallback only
+    // for bookings whose lines predate the id columns.
     const parsedPkgs: AttachedPackageItem[] = [];
+    const linkedPkgLines: any[] = Array.isArray((targetBooking as any).attachedProducts)
+      ? (targetBooking as any).attachedProducts.filter((ap: any) => ap?.packageId || ap?.customerPackageId)
+      : [];
+
+    if (linkedPkgLines.length > 0) {
+      linkedPkgLines.forEach((line, idx) => {
+        const linePackageId = line.packageId ? String(line.packageId) : "";
+        const lineCpId = line.customerPackageId ? String(line.customerPackageId) : undefined;
+        const foundPkg = pkgList.find((p) => String(p.id) === linePackageId);
+        const foundCp = patientExistingPackages.find(
+          (cp) => String(cp.id) === lineCpId || String(cp.packageId || "") === linePackageId
+        );
+        // description is stored as "Package: <name>" — strip the prefix when the
+        // catalog can't supply the (possibly renamed) current name.
+        const storedName = String(line.name || "").replace(/^Package:\s*/i, "").trim();
+        const isPulse = Boolean(foundPkg?.packageType === "pulses" || Number(foundPkg?.totalPulses || foundCp?.totalPulses || 0) > 0);
+        const total = Number(foundPkg?.totalPulses ?? foundCp?.totalPulses ?? 0);
+        // Pulse usage counts: from the live patient package when one is linked,
+        // otherwise a single-package booking may still read its [Package Usage]
+        // marker from notes (the only place historical usage counts exist).
+        const usageMatch =
+          !foundCp && linkedPkgLines.length === 1
+            ? rawNotes.match(/\[Package Usage\]:\s*([\d,]+)\s*(?:\/\s*([\d,]+))?\s*pulses used(?:\s*\(([\d,]+)\s*pulses remaining\))?/i)
+            : null;
+        const u = foundCp
+          ? Number(foundCp.usedPulses ?? 0)
+          : usageMatch && usageMatch[1]
+          ? (parseInt(usageMatch[1].replace(/,/g, ""), 10) || 0)
+          : 0;
+        const r = foundCp
+          ? Number(foundCp.pulsesRemaining ?? Math.max(0, total - u))
+          : usageMatch && usageMatch[3]
+          ? (parseInt(usageMatch[3].replace(/,/g, ""), 10) || 0)
+          : Math.max(0, total - u);
+
+        parsedPkgs.push({
+          id: `edit-pkg-${idx}-${Date.now()}`,
+          source: foundCp ? "existing" : "catalog",
+          packageId: linePackageId || String(foundCp?.packageId || ""),
+          customerPackageId: foundCp ? String(foundCp.id) : lineCpId,
+          name: foundPkg?.name || foundCp?.packageName || storedName || `Package #${idx + 1}`,
+          nameAr: foundPkg?.nameAr || foundCp?.packageNameAr,
+          price: foundCp ? 0 : Number(line.unitPrice ?? foundPkg?.price ?? 0),
+          packageType: isPulse ? "pulses" : "services",
+          totalPulses: total,
+          pulsesUsed: u,
+          pulsesRemaining: r,
+          initialBookingPulsesUsed: u,
+          packageLiveRemaining: r,
+          servicesUsage: {},
+          items: foundPkg?.items || foundCp?.items || []
+        });
+      });
+    } else {
     const packageBlocks = rawNotes.split(/Package:\s*/i).slice(1);
 
     if (packageBlocks.length > 0) {
@@ -1007,6 +1066,7 @@ export const AdminAddPreviousBookingView: React.FC<AdminAddPreviousBookingViewPr
         servicesUsage: {},
         items: foundPkg?.items || []
       });
+    }
     }
 
     if (parsedPkgs.length > 0) {
