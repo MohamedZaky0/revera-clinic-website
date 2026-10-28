@@ -2318,3 +2318,24 @@ All are `GET`, need a staff token plus the permission shown, and take `branchId?
 - **GET /api/finance/service-mix** — `finance.view_margins` (or `reports.view_financial_reports`). Break-even revenue, services ranked by contribution margin per bottleneck minute, the greedy-optimal allocation, maximum potential revenue and the gap decomposed into idle capacity, suboptimal mix and no-show loss. **Response:** `{ range, branchId, note, breakEven, rankedServices, capacity, allocation, maxPotentialRevenue, actualServiceRevenue, gapToPotential, gapDecomposition }`. The demand cap per service is the period's actual delivered sessions, not a forecast.
 - **GET /api/finance/revenue-bridge** — `finance.view_pnl`. Cash received in the period (payments on live issued invoices, as `cashflow`) and how much of it paid for packages (deferred, DEC-088 item 9). **Response:** `{ range, branchId, cashReceived, packageCashReceived }`. Opening (historical) invoices are excluded.
 - **GET /api/finance/deferred-packages** — `finance.view_pnl`. No parameters. The deferred package balance as of now: money collected for services not yet delivered, by pulses and by sessions per service, plus packages whose price is still pending. **Response:** `{ asOf, ... }` from `computeDeferredBreakdown`.
+
+---
+
+## Prescriptions
+
+Staff only. Manages digital clinical prescriptions and immutable version history (DEC-137, TC-056, TC-105).
+
+### GET /api/prescriptions
+Fetches prescriptions. Supports querying by booking (`bookingId`), customer (`customerId`), and session date (`date`). If `bookingId` yields no record, automatically falls back to finding the customer's prescription for the given date.
+- **Query Params:** `bookingId` (optional), `customerId` (optional), `date` (optional), `includeHistory` (boolean, default false).
+- **Response:** `{ prescriptions: Prescription[] }` or array of prescriptions.
+
+### POST /api/prescriptions
+Creates or updates (versions) a digital clinical prescription.
+- **Body:** `{ booking_id?, customer_id, customer_name, doctor_id, doctor_name, diagnosis, medications, instructions, follow_up_date?, follow_up_notes?, id? }`.
+- **Behavior:**
+  - If `id` is provided, versions the existing prescription: creates new row with `version = previous.version + 1`, `is_latest = true`, linking `parent_prescription_id` and `root_prescription_id`, and setting previous to `is_latest = false`.
+  - Safely handles non-UUID `booking_id` (strips from Supabase insert if non-UUID to prevent Postgres `22P02` syntax error, while preserving `booking_id` in API response and local JSON fallback).
+  - Automatically updates `reservations.follow_up_date` if follow-up is specified and `booking_id` is a valid UUID.
+- **Response:** `{ success: true, prescription: Prescription }`.
+

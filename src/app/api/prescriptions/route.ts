@@ -42,6 +42,7 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const customerId = searchParams.get('customerId') || searchParams.get('customer_id');
     const bookingId = searchParams.get('bookingId') || searchParams.get('booking_id');
+    const bookingDate = searchParams.get('date');
     const patientName = searchParams.get('patientName') || searchParams.get('patient_name');
     const rootId = searchParams.get('rootId') || searchParams.get('root_id') || searchParams.get('history_for');
     const allVersions = searchParams.get('all_versions') === 'true';
@@ -73,6 +74,26 @@ export async function GET(req: Request) {
 
       let { data, error } = await query;
 
+      // Fallback: If querying by bookingId returned nothing, but customerId is provided,
+      // search by customerId as fallback so prescriptions saved without booking_id are still surfaced.
+      if (!error && bookingId && bookingId !== 'all' && (!data || data.length === 0) && customerId && customerId !== 'all') {
+        let fallbackCustomerQuery = supabaseServer
+          .from('prescriptions')
+          .select('*')
+          .eq('customer_id', customerId);
+        if (!allVersions) {
+          fallbackCustomerQuery = fallbackCustomerQuery.or('is_latest.eq.true,is_latest.is.null');
+        }
+        if (bookingDate) {
+          fallbackCustomerQuery = fallbackCustomerQuery.eq('date', bookingDate);
+        }
+        fallbackCustomerQuery = fallbackCustomerQuery.order('created_at', { ascending: false }).order('date', { ascending: false });
+        const custRes = await fallbackCustomerQuery;
+        if (!custRes.error && custRes.data && custRes.data.length > 0) {
+          data = custRes.data;
+        }
+      }
+
       if (error && (error.message?.includes('root_prescription_id') || error.message?.includes('is_latest') || error.code === 'PGRST204')) {
         // Fallback query if columns not yet migrated
         let fallbackQuery = supabaseServer
@@ -102,7 +123,18 @@ export async function GET(req: Request) {
               local = local.filter((p: any) => p.is_latest !== false);
             }
             if (bookingId && bookingId !== 'all') {
-              local = local.filter((p: any) => String(p.booking_id) === String(bookingId));
+              const direct = local.filter((p: any) => String(p.booking_id) === String(bookingId));
+              if (direct.length > 0) {
+                local = direct;
+              } else if (customerId && customerId !== 'all') {
+                local = local.filter((p: any) => {
+                  const matchCust = String(p.customer_id) === String(customerId);
+                  const matchDate = !bookingDate || p.date === bookingDate;
+                  return matchCust && matchDate;
+                });
+              } else {
+                local = [];
+              }
             } else if (customerId && customerId !== 'all') {
               local = local.filter((p: any) => String(p.customer_id) === String(customerId));
             } else if (patientName) {
@@ -127,7 +159,18 @@ export async function GET(req: Request) {
             local = local.filter((p: any) => p.is_latest !== false);
           }
           if (bookingId && bookingId !== 'all') {
-            local = local.filter((p: any) => String(p.booking_id) === String(bookingId));
+            const direct = local.filter((p: any) => String(p.booking_id) === String(bookingId));
+            if (direct.length > 0) {
+              local = direct;
+            } else if (customerId && customerId !== 'all') {
+              local = local.filter((p: any) => {
+                const matchCust = String(p.customer_id) === String(customerId);
+                const matchDate = !bookingDate || p.date === bookingDate;
+                return matchCust && matchDate;
+              });
+            } else {
+              local = [];
+            }
           } else if (customerId && customerId !== 'all') {
             local = local.filter((p: any) => String(p.customer_id) === String(customerId));
           } else if (patientName) {
@@ -161,7 +204,8 @@ export async function POST(req: Request) {
   const id = body.id;
   const customerId = body.customer_id || body.customerId;
   const rawBookingId = body.booking_id || body.bookingId;
-  const cleanBookingId = (rawBookingId && rawBookingId !== 'undefined' && rawBookingId !== 'null') ? rawBookingId : null;
+  const cleanBookingId = (rawBookingId && rawBookingId !== 'undefined' && rawBookingId !== 'null') ? String(rawBookingId).trim() : null;
+  const isBookingIdUuid = Boolean(cleanBookingId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanBookingId));
   const patientName = body.patient_name || body.customer_name;
   const diagnosis = body.diagnosis;
   const medications = body.medications;
@@ -176,6 +220,7 @@ export async function POST(req: Request) {
   }
 
   const basePrescriptionData: Record<string, any> = {
+    booking_id: cleanBookingId || null,
     customer_id: customerId || null,
     patient_name: patientName,
     date: body.date || new Date().toISOString().slice(0, 10),
@@ -189,22 +234,6 @@ export async function POST(req: Request) {
     follow_up_notes: followUpNotes,
     updated_at: new Date().toISOString()
   };
-
-  if (cleanBookingId) {
-    try {
-      const { data: resMatch } = await supabaseServer
-        .from('reservations')
-        .select('id')
-        .eq('id', cleanBookingId)
-        .maybeSingle();
-
-      if (resMatch?.id) {
-        basePrescriptionData.booking_id = cleanBookingId;
-      }
-    } catch (_) {
-      // Ignore lookup error and proceed without setting booking_id
-    }
-  }
 
   try {
     try {
@@ -256,6 +285,10 @@ export async function POST(req: Request) {
           updated_at: new Date().toISOString()
         };
 
+        if (newVersionData.booking_id && !isBookingIdUuid) {
+          delete newVersionData.booking_id;
+        }
+
         let { data, error } = await supabaseServer
           .from('prescriptions')
           .insert(newVersionData)
@@ -264,14 +297,16 @@ export async function POST(req: Request) {
 
         if (error && (
           error.code === '23503' ||
+          error.code === '22P02' ||
           error.code === 'PGRST204' ||
           error.code === '42703' ||
           error.message?.includes('booking_id') ||
           error.message?.includes('follow_up_notes') ||
           error.message?.includes('foreign key constraint') ||
-          error.message?.includes('prescriptions_booking_id_fkey')
+          error.message?.includes('prescriptions_booking_id_fkey') ||
+          error.message?.includes('invalid input syntax for type uuid')
         )) {
-          if (error.message?.includes('booking_id') || error.code === '23503') delete newVersionData.booking_id;
+          if (error.message?.includes('booking_id') || error.code === '23503' || error.code === '22P02' || error.message?.includes('invalid input syntax for type uuid')) delete newVersionData.booking_id;
           if (error.message?.includes('follow_up_notes') || error.code === '42703' || error.code === 'PGRST204') delete newVersionData.follow_up_notes;
           const retry = await supabaseServer
             .from('prescriptions')
@@ -297,6 +332,10 @@ export async function POST(req: Request) {
           updated_at: new Date().toISOString()
         };
 
+        if (newPrescriptionPayload.booking_id && !isBookingIdUuid) {
+          delete newPrescriptionPayload.booking_id;
+        }
+
         let { data, error } = await supabaseServer
           .from('prescriptions')
           .insert(newPrescriptionPayload)
@@ -305,14 +344,16 @@ export async function POST(req: Request) {
 
         if (error && (
           error.code === '23503' ||
+          error.code === '22P02' ||
           error.code === 'PGRST204' ||
           error.code === '42703' ||
           error.message?.includes('booking_id') ||
           error.message?.includes('follow_up_notes') ||
           error.message?.includes('foreign key constraint') ||
-          error.message?.includes('prescriptions_booking_id_fkey')
+          error.message?.includes('prescriptions_booking_id_fkey') ||
+          error.message?.includes('invalid input syntax for type uuid')
         )) {
-          if (error.message?.includes('booking_id') || error.code === '23503') delete newPrescriptionPayload.booking_id;
+          if (error.message?.includes('booking_id') || error.code === '23503' || error.code === '22P02' || error.message?.includes('invalid input syntax for type uuid')) delete newPrescriptionPayload.booking_id;
           if (error.message?.includes('follow_up_notes') || error.code === '42703' || error.code === 'PGRST204') delete newPrescriptionPayload.follow_up_notes;
           const retry = await supabaseServer
             .from('prescriptions')
@@ -342,8 +383,12 @@ export async function POST(req: Request) {
         result = data;
       }
 
+      if (result && cleanBookingId && !result.booking_id) {
+        result.booking_id = cleanBookingId;
+      }
+
       // Automatically sync follow_up_date to the corresponding reservation record
-      if (cleanBookingId && followUpDate) {
+      if (cleanBookingId && followUpDate && isBookingIdUuid) {
         try {
           await supabaseServer
             .from('reservations')
@@ -378,6 +423,7 @@ export async function POST(req: Request) {
           result = {
             id: newId,
             ...basePrescriptionData,
+            booking_id: cleanBookingId || previousLocal?.booking_id || null,
             customer_id: customerId || previousLocal?.customer_id || null,
             patient_name: patientName || previousLocal?.patient_name || 'Patient',
             version: newVersion,

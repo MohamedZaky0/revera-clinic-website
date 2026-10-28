@@ -1378,6 +1378,22 @@ Specifically, `amountLeft` in the `reservations` table MUST reflect the true unp
   - `POST /api/customers/settle-debt` accepts an optional `reservationId`. When provided and not `'all'`, it targets only that specific reservation, validating that `amount <= amount_left`, updating the reservation's `amount_paid` and `amount_left`, appending a payment with an atomic `INV-XXXXXX` reference, logging an `outstanding_payment` transaction in the financial ledger, and reducing the customer's `outstanding` and increasing `spent_amount`. If omitted or `'all'`, it falls back to FIFO oldest-first settlement across unpaid bookings.
 - **System Test Suite**: Verified under `TC-104` in the Admin Settings System Test Suite.
 
+### 16. Doctor Prescription Persistence, Non-UUID Safety & Real-Time Booking Details Synchronization Rule
+**Enforced in:** `src/app/api/prescriptions/route.ts`, `src/components/admin/bookings/BookingDetailsModal.tsx`, `src/components/admin/doctor/tabs/DoctorOngoingSessionTab.tsx`, `src/app/admin/page.tsx`
+- **Postgres Non-UUID Safety (`22P02`)**:
+  - In `POST /api/prescriptions`, synthetic/non-UUID reservation IDs (e.g., `'1780826201251-408'` or local test IDs) are guarded with UUID regex (`/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i`).
+  - Synthetic non-UUID IDs are preserved in `basePrescriptionData.booking_id`, the API response, and local fallback storage (`data/prescriptions.json`), but are cleanly omitted when querying Supabase `reservations` or inserting into `prescriptions.booking_id` to prevent fatal Postgres syntax error `22P02`.
+  - Postgres errors `22P02` and `23503` (Foreign Key violation) are caught with automatic fallback to insert without `booking_id`.
+- **Composite Customer & Date Fallback Query**:
+  - `GET /api/prescriptions` supports `customerId` and `date` parameters. If a query by `bookingId` returns no matches (e.g. prescription created with unlinked synthetic booking ID), the route automatically falls back to finding the customer's prescription for that session date.
+- **Real-Time Cross-Component Broadcast Sync**:
+  - `BookingDetailsModal.tsx` subscribes to `revera-prescription-change` and `revera-booking-change` window events. When a doctor writes or updates a prescription in `DoctorOngoingSessionTab.tsx`, open Booking Details modals immediately reload and display the recorded prescription without requiring drawer close or page reload.
+- **End Session Form Pre-Population**:
+  - When opening the End Session view in `BookingDetailsModal.tsx`, previously recorded prescription details (diagnosis, medications, instructions, follow-up) automatically pre-fill the form, and saving carries forward the existing prescription ID for clean versioning rather than creating disconnected duplicate records.
+- **Doctor Session Unsaved Auto-Save**:
+  - When the doctor clicks "Complete Treatment" in `DoctorOngoingSessionTab.tsx`, any unsaved prescription data entered in the form is automatically persisted before completing the booking.
+- **System Test Suite**: Verified under `TC-105` in the Admin Settings System Test Suite.
+
 ---
 
 ## Rules added after the 2026-07-30 pass (DEC-113 to DEC-121, RISK-128)

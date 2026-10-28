@@ -4161,3 +4161,35 @@ A failure in steps 2 to 5 undoes the earlier steps (figures restored, sessions t
    - Registered `GET /api/customers/settle-debt` in `tests/routes/auth-sweep.test.ts` (all 318 tests passing).
    - Verified clean production build with `npm run build` (0 compiler/TypeScript errors).
 
+---
+
+## DEC-137: Doctor Prescription Persistence, Non-UUID Safety & Real-Time Booking Details Synchronization
+
+**Date:** 2026-10-28
+**Status:** Decided & implemented
+
+**Context:**
+1. **Prescriptions Missing in Booking Details**: When a doctor wrote and saved a digital prescription during an ongoing clinical session (in `DoctorOngoingSessionTab.tsx`), the prescription failed to appear in the Booking Details modal (`BookingDetailsModal.tsx`) when viewing that booking.
+2. **Root Cause Analysis**:
+   - In `POST /api/prescriptions`, `basePrescriptionData.booking_id` was previously guarded behind a redundant check `await supabaseServer.from('reservations').select('id').eq('id', cleanBookingId).maybeSingle()`. When non-UUID booking IDs (e.g. `'1780826201251-408'` in local data or custom test IDs) or uncommitted IDs were used, Supabase Postgres threw a `22P02` syntax error. The catch block swallowed it, causing `booking_id` to be silently stripped. In local fallback (`data/prescriptions.json`), every single prescription was written with `booking_id: null`.
+   - In `GET /api/prescriptions`, an `else if` between `bookingId` and `customerId` meant that querying by `bookingId` completely ignored `customerId`. If `booking_id` in the database was null, the query returned `[]`.
+   - `BookingDetailsModal.tsx` lacked an event listener for `revera-prescription-change` (which `DoctorOngoingSessionTab` dispatches), leaving open modals stale.
+   - When switching to End Session mode (`viewMode === "end_session"`), `rxDiagnosis`, `rxMedications`, and clinical notes were never prefilled from existing prescriptions, showing empty form fields and risking accidental overwrite.
+   - If a doctor filled in prescription fields but completed treatment without explicitly clicking "Save Prescription", entered prescription details were not auto-saved.
+
+**Decision:**
+1. **Prescription Booking Linkage & Non-UUID Safety**:
+   - `POST /api/prescriptions`: `cleanBookingId` is always preserved in `basePrescriptionData.booking_id`. For Supabase Postgres (where column `booking_id` is a UUID FK), if `cleanBookingId` is not a UUID, `booking_id` is omitted from the Supabase insert payload to prevent `22P02`, while being retained in the returned result and local JSON. Postgres FK error `23503` and `22P02` are caught with automatic retry without `booking_id`.
+   - `GET /api/prescriptions`: Accepts `customerId` and `date` alongside `bookingId`. If `bookingId` returns 0 results but `customerId` is provided, automatically falls back to finding the customer's prescription for that session date.
+2. **Real-Time Zero-Reload Synchronization**:
+   - `BookingDetailsModal.tsx`: Extracted `loadPrescriptions` querying `bookingId`, `customerId`, and `date`. Added listeners for `revera-prescription-change` and `revera-booking-change` with cleanup on unmount.
+   - Pre-fills `rxDiagnosis`, `rxMedications`, `rxGeneralNotes`, and follow-up data into state when prescriptions load, and tracks `existingRxId`.
+   - In `handleSaveInlinePrescription` and `handleConfirmEndSession`, passes `id: existingRxId` to perform immutable version updates instead of creating orphaned duplicate rows.
+   - In Card B (PRESCRIPTION), added an "Edit" button next to the Recorded date badge to open `showDrawerPrescriptionModal` pre-populated with existing prescription details.
+3. **Doctor Portal Auto-Save**:
+   - `DoctorOngoingSessionTab.tsx`: When "Complete Treatment" is clicked, if the doctor entered prescription details (`rxDiagnosis` or `rxMedications`) without explicitly clicking "Save Prescription", auto-saves inline before completing the session.
+4. **Automated Verification**:
+   - Added test case `TC-105: Doctor Prescription & Booking Details Real-Time Sync Engine` to the Admin Settings System Test Suite (`INITIAL_SYSTEM_TEST_SUITES`).
+   - Added unit test suite `tests/routes/prescriptions-booking-sync.test.ts` (5 passed).
+   - Verified `DoctorOngoingSessionTab.test.tsx` (13 passed).
+
