@@ -383,11 +383,6 @@ export default function ReceptionDashboardView({
   const isInProgress = rawStatus === "started" || rawStatus === "in_progress";
   const isCompleted = rawStatus === "ended" || rawStatus === "completed";
 
-  // Branch Name resolution
-  const displayBranchName = lang === "ar" 
-    ? (dashboardData?.receptionist?.branchNameAr || activeBranchNameAr)
-    : (dashboardData?.receptionist?.branchNameEn || activeBranchName);
-
   // Formatted current date
   const todayFormatted = useMemo(() => {
     const d = new Date();
@@ -528,10 +523,7 @@ export default function ReceptionDashboardView({
           <div className="h-9 w-9 rounded-xl bg-[#F0F4EC] text-[var(--cr-primary)] flex items-center justify-center shrink-0">
             <Calendar size={18} />
           </div>
-          <div>
-            <p className="text-xs font-bold text-[var(--cr-dark)]">{todayFormatted}</p>
-            <p className="text-[11px] text-[#788272] font-medium">{displayBranchName}</p>
-          </div>
+          <p className="text-xs font-bold text-[var(--cr-dark)]">{todayFormatted}</p>
         </div>
       </div>
 
