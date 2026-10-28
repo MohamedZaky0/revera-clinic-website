@@ -14,6 +14,8 @@ export interface InvoiceBookingData {
   laserPaymentMode?: string;
   laserPricePerPulse?: number;
   laserSettlementNote?: string;
+  invoiceNo?: string;
+  invoice_no?: string;
 }
 
 export interface ServiceItemData {
@@ -30,7 +32,8 @@ export function printInvoice(
   servicesList: ServiceItemData[],
   totalCost: number,
   walletUsed: number = 0,
-  branchName: string = 'Main Branch'
+  branchName: string = 'Main Branch',
+  overrideInvoiceNo?: string
 ) {
   const printWindow = window.open('', '_blank');
   if (!printWindow) {
@@ -38,7 +41,7 @@ export function printInvoice(
     return;
   }
 
-  const invoiceNo = `INV-${booking.id.slice(0, 8).toUpperCase()}`;
+  const invoiceNo = overrideInvoiceNo || booking.invoiceNo || booking.invoice_no || (booking as any)?.invoice_number || `INV-${booking.id.slice(0, 8).toUpperCase()}`;
 
   const isPerPulse = Boolean(
     booking.laserPaymentMode === "PER_PULSE" ||

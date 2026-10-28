@@ -1,6 +1,6 @@
 # ai_docs — Revera Clinics Agent Knowledge Base
 
-> **Last Updated:** 2026-10-21 (full audit of every file in this folder against `dev`: stale statements corrected, the status snapshot rewritten, the file index completed)
+> **Last Updated:** 2026-10-28 (DEC-136: Payment Status Threshold & Per-Session Debt Settlement Engine)
 > **Branch:** dev (these docs do not belong on main/production)
 > **Maintained by:** Project manager. Updated whenever architecture, decisions, or risks change.
 

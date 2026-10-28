@@ -4298,11 +4298,11 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                         <span className={`rounded-full px-3 py-0.5 text-xs font-extrabold ${
                           isInvoicePaid 
                             ? 'bg-[#EBF7EE] text-[#1E7E34]' 
-                            : (pulseDeficit > 0 && !hasSettledDeficit) || sessionPaid > 0
+                            : sessionPaid >= 1
                             ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                            : 'bg-amber-50 text-amber-800'
+                            : 'bg-rose-50 text-rose-800 border border-rose-200'
                         }`}>
-                          {isInvoicePaid ? "Paid" : (pulseDeficit > 0 && !hasSettledDeficit) || sessionPaid > 0 ? "Partially Paid" : "Unpaid"}
+                          {isInvoicePaid ? "Paid" : sessionPaid >= 1 ? "Partially Paid" : "Unpaid"}
                         </span>
                       </div>
                     </div>
@@ -4333,7 +4333,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                               ...additionalServicesList.map(s => ({ id: s.name, name: s.name, price: s.total })),
                               ...productsConsumablesList.map(p => ({ id: p.name, name: `${p.name} (x${p.qty})`, price: p.total }))
                             ];
-                            printInvoice(booking as any, allInvoiceItems, totalPrice, 0, bName);
+                            printInvoice(booking as any, allInvoiceItems, totalPrice, 0, bName, (booking as any).invoiceNo || (booking as any).invoice_no);
                           }
                         }}
                         className="rounded-2xl border border-gray-200 bg-white py-2.5 px-2 text-xs font-bold text-[var(--cr-dark)] hover:bg-gray-50 transition flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer"

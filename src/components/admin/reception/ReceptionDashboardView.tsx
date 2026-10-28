@@ -461,7 +461,15 @@ export default function ReceptionDashboardView({
         doctorSpecialty: r.specialty || "Specialist",
         doctorImage: null,
         service: r.serviceName || r.service || (r.serviceId ? `Service #${r.serviceId}` : "Consultation"),
-        paymentStatus: (r.amountPaid && Number(r.amountPaid) > 0) || (r.amountLeft !== null && Number(r.amountLeft) === 0 && (r.status === 'completed' || r.laserPaymentMode === 'PACKAGE' || r.laser_payment_mode === 'PACKAGE' || r.packageId || r.customerPackageId || String(r.notes || '').includes('Package'))) ? "Paid" : (r.amountLeft && Number(r.amountLeft) > 0 ? "Partial" : "Unpaid"),
+        paymentStatus: (() => {
+          const p = Number(r.amountPaid || r.amount_paid || 0);
+          const l = r.amountLeft !== null && r.amountLeft !== undefined ? Number(r.amountLeft) : (r.amount_left !== null && r.amount_left !== undefined ? Number(r.amount_left) : null);
+          const isPkg = Boolean(r.laserPaymentMode === 'PACKAGE' || r.laser_payment_mode === 'PACKAGE' || r.packageId || r.customerPackageId || String(r.notes || '').includes('Package'));
+          if (l !== null && l <= 0) return "Paid";
+          if (isPkg && (r.status === 'completed' || l === 0)) return "Paid";
+          if (p >= 1 && (l === null || l > 0)) return "Partial";
+          return "Unpaid";
+        })(),
         amountPaid: Number(r.amountPaid || r.amount_paid || 0),
         amountLeft: Number(r.amountLeft || r.amount_left || 0),
         totalPrice: Number(r.cost || r.totalPrice || r.amountPaid || 0),

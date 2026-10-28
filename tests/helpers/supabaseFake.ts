@@ -119,8 +119,12 @@ function matchesFilter(row: FakeRow, f: Filter): boolean {
       return cell === f.val || (cell != null && f.val != null && String(cell) === String(f.val));
     case 'neq':
       return !matchesFilter(row, { ...f, op: 'eq' });
-    case 'in':
-      return (f.val as any[]).some((v) => String(v) === String(cell));
+    case 'in': {
+      const list = Array.isArray(f.val)
+        ? f.val
+        : String(f.val).replace(/^\(|\)$/g, '').split(',').map((s) => s.replace(/^"|"$/g, '').trim());
+      return list.some((v) => String(v) === String(cell));
+    }
     case 'gt':
       return cell != null && cell > f.val;
     case 'gte':

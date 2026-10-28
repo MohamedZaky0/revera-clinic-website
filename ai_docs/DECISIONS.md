@@ -3537,6 +3537,7 @@ Investigation revealed:
 
 ---
 
+<<<<<<< HEAD
 ---
 
 ## DEC-105: Manual Payments & Wallet Movements Reopened — Superadmin Always, Other Roles By Role-Management Grant
@@ -4105,3 +4106,61 @@ A failure in steps 2 to 5 undoes the earlier steps (figures restored, sessions t
 **Accepted cost:** a doctor employee that has no `providers` row (for example after a role is switched to a doctor workspace) now gets one when a staff member next opens the admin, not on the next public page view. `POST`/`PATCH /api/employees` create the row immediately, so this affects only that rare path.
 
 **Tests:** `tests/routes/providers-public-projection.test.ts`, `tests/components/doctor/useProviderFormToken.test.tsx`, `tests/routes/public-read-caching.test.ts`. Manual checklist: `ai_docs/manual_tests/PROVIDERS_PUBLIC_PROJECTION_MANUAL_TESTS.md`.
+
+---
+
+## DEC-135: Unique Payment Sequence References & Manual Booking Invoice Normalization
+
+**Date:** 2026-10-26
+**Status:** Decided & implemented
+
+**Context:**
+1. **Invoice Number Duplication Across Payments:** When bookings were completed, an invoice `INV-000001` was generated. Subsequent payments against the same reservation (e.g., checkout balances after deposit, later balance settlements in `appendPaymentToExistingInvoice`, or debt settlements in `/api/customers/settle-debt`) were recorded with `referenceNo: null`. When displayed in transaction history or patient transaction tables, the UI fell back to `{tx.reference_no || tx.invoice_no}`, causing both Payment 1 and Payment 2 to display the same invoice number (`INV-000001`). In accounting and financial audits, every payment receipt must carry its own unique, sequential reference number.
+2. **Manual Booking Legacy Invoice Formation:** Manual bookings (`POST /api/reservations` with `isManual: true`) previously did not create an `invoices` row. When staff opened "View Invoice" or printed invoices, the modal and PDF printer fell back to legacy temporary formations (`REV-INV-${id.slice(0, 8)}` or `INV-${id.slice(0, 8)}`), violating the sequential numbering requirement (`INV-XXXXXX`).
+
+**Decision:**
+1. **Unique Sequential Receipt References (`next_invoice_no`):**
+   - In `recordTransaction` (`src/lib/transactionLedger.ts`): If `referenceNo` is omitted, the engine automatically generates an atomic sequential reference using `next_invoice_no` formatted as `INV-XXXXXX`.
+   - In `writeCheckoutInvoice` (`src/app/api/reservations/route.ts`): Reuses any pre-existing invoice for the reservation rather than generating duplicate invoice rows. If `priorPaid > 0` and `newMoneyAtCheckout > 0`, generates a fresh unique sequence reference (`next_invoice_no`) for the checkout payment so Payment 1 and Payment 2 have distinct reference numbers.
+   - In `appendPaymentToExistingInvoice` (`src/app/api/reservations/route.ts`): Generates an atomic sequential reference when `paymentReference` is null, writing it to `payments.reference` and `recordTransaction.referenceNo`.
+   - In `/api/customers/settle-debt` (`src/app/api/customers/settle-debt/route.ts`): Automatically generates unique sequential references for all debt settlement payments against issued invoices.
+2. **Manual Booking Invoice Creation & Normalization:**
+   - In `POST /api/reservations`: When `isManual` is true, an authoritative invoice row (`invoices`) and itemized lines (`invoice_lines`) are immediately created with an atomic sequential `INV-XXXXXX` number. If an initial payment is collected, a payment row (`payments`) and ledger transaction (`recordTransaction`) are created referencing this invoice number.
+   - In `GET /api/reservations`: Batch-fetches invoice numbers and enriches each reservation with `invoiceNo`.
+   - In `GET /api/invoices`: If no invoice is found for an existing reservation, auto-creates the standard `INV-XXXXXX` invoice, line items, and payment row.
+   - Eliminated legacy `REV-INV-${id.slice(0, 8)}` fallbacks in `src/app/admin/page.tsx` (lines 10668 & 11142) and `src/lib/printUtils.ts`. PDF print and modal preview now strictly use sequential `INV-XXXXXX` numbers.
+3. **Automated Verification:**
+   - Added test case `TC-103: Unique Payment Sequence Numbering & Manual Booking Invoice Generation` in Admin Settings System Test Suite (`/admin -> Settings -> System Test Suite`).
+   - Verified clean compilation with `tsc --noEmit` (0 errors) and `npm run build`.
+
+---
+
+## DEC-136: Payment Status Threshold & Per-Session Debt Settlement Engine
+
+**Date:** 2026-10-28
+**Status:** Decided & implemented
+
+**Context:**
+1. **Payment Status Derivation Inconsistency**: When a session started and ended with zero payments made (`amountPaid = 0`), completed sessions in `AdminBookingsView.tsx` previously evaluated to `"Partially Paid"` due to a conditional clause `st !== "completed"` causing the evaluation to fall through to `else if (amtLeft > 0)`. In `ReceptionDashboardView.tsx`, a ternary bug treated any `amountLeft > 0` as `"Partial"` even when `amountPaid = 0`. Staff expected strict behavior: if a session ends with 0 EGP paid, its payment situation must strictly be `"Unpaid"`, and `"Partially Paid"` must only begin when at least 1 EGP has been collected until fully paid.
+2. **Settle Balance Accessibility**: In the patient profile, staff should only see or open the "Settle Balance" action if the patient actually carries an outstanding debt (`customer.outstanding > 0`).
+3. **Itemized Per-Session Balance Settlement**: If a patient has outstanding balances across one or more past sessions, staff needed visibility into an itemized session list (date, time, service names, doctor, total price, paid amount, and remaining debt) to select which specific session to settle, rather than only having an opaque bulk FIFO settlement.
+
+**Decision:**
+1. **Strict Payment Status Calculation**:
+   - `AdminBookingsView.tsx`: Removed `st !== "completed"` from the `amtPaid <= 0` branch. Formulated strictly: `amtPaid < 1 && amtLeft > 0` is `"Unpaid"`; `amtPaid >= 1 && amtLeft > 0` is `"Partially Paid"`; `amtLeft <= 0` or zero-cost completed/historical bookings is `"Paid"`.
+   - `BookingDetailsModal.tsx`: Updated badge to `{isInvoicePaid ? "Paid" : sessionPaid >= 1 ? "Partially Paid" : "Unpaid"}`.
+   - `ReceptionDashboardView.tsx`: Updated payment status derivation so `r.amountPaid < 1 && r.amountLeft > 0` evaluates strictly to `"Unpaid"`, and `"Partial"` begins only at `r.amountPaid >= 1`.
+   - `CustomerProfileDrawer.tsx`: Updated Booking History table payment status: `const paymentStatus = left <= 0 ? "paid" : (spent >= 1 ? "partial" : "unpaid");`.
+2. **Settle Balance Gating**:
+   - In `CustomerProfileDrawer.tsx`, the "Settle Balance" button in the Outstanding financial card is rendered conditionally only when `Number(viewingCustomerProfile.outstanding || 0) > 0` and the user possesses `customers.action_settle_balance` permission.
+   - In `SettleDebtModal.tsx`, a zero-debt guard alert informs staff if outstanding balance is 0.
+3. **Itemized Per-Session Breakdown & Targeted Settlement**:
+   - `GET /api/customers/settle-debt`: Added GET handler. When called without `customerId`, returns operational test status (`{ success: true, status: 'operational' }`). When called with `?customerId=...`, queries all unpaid reservations (`amount_left > 0`), resolves service names, doctor names, and invoice numbers, returning `{ customer, unpaidSessions }`.
+   - `SettleDebtModal.tsx`: Redesigned with an interactive session picker displaying all unpaid sessions. Selecting an individual session auto-fills the settlement amount with that session's remaining debt. Selecting "All Sessions" auto-fills the total outstanding balance.
+   - `POST /api/customers/settle-debt`: Added support for optional `reservationId`. When provided and not `'all'`, validates that `amount <= amount_left`, updates that specific reservation's `amount_paid` and `amount_left`, appends the payment to its issued invoice with a unique atomic sequential reference (`INV-XXXXXX`), records an `outstanding_payment` transaction in the financial ledger, and decrements `customers.outstanding` and increments `customers.spent_amount`. If omitted or `'all'`, applies FIFO settlement across unpaid reservations.
+4. **Automated Verification**:
+   - Added test case `TC-104: Payment Status Calculation & Multi-Session Debt Settlement Engine` to the Admin Settings System Test Suite (`INITIAL_SYSTEM_TEST_SUITES`).
+   - Added route tests in `tests/routes/settle-debt.test.ts` covering GET unpaid session breakdown, operational ping, targeted reservation settlement, and over-allocation rejection.
+   - Registered `GET /api/customers/settle-debt` in `tests/routes/auth-sweep.test.ts` (all 318 tests passing).
+   - Verified clean production build with `npm run build` (0 compiler/TypeScript errors).
+

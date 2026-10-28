@@ -21,7 +21,7 @@ vi.mock('@/lib/supabaseServer', () => ({
   },
 }));
 
-import { POST } from '@/app/api/customers/settle-debt/route';
+import { GET, POST } from '@/app/api/customers/settle-debt/route';
 
 const CUSTOMER_ID = 'cust-1';
 const EMP_ID = 'emp-1';
@@ -37,6 +37,15 @@ function makeReq(body: any, withAuth = true): Request {
   });
 }
 
+function makeGetReq(url = 'http://localhost:3000/api/customers/settle-debt', withAuth = true): Request {
+  const headers = new Headers();
+  if (withAuth) headers.set('Authorization', 'Bearer staff-token');
+  return new Request(url, {
+    method: 'GET',
+    headers,
+  });
+}
+
 function seedStaffAuth() {
   fake.authGetUser.mockResolvedValue({ data: { user: { id: USER_ID } }, error: null });
   fake.seed('employee_accounts', [{ id: EMP_ID, auth_user_id: USER_ID, role_name: 'reception', email: 'r@test.com' }]);
@@ -45,6 +54,8 @@ function seedStaffAuth() {
 
 /** A completed booking carrying unpaid balance, plus the issued invoice it belongs to. */
 function seedUnpaidBooking(id: string, date: string, paid: number, left: number) {
+  if (!fake.db.reservations) fake.db.reservations = [];
+  if (!fake.db.invoices) fake.db.invoices = [];
   fake.db.reservations.push({
     id, date, status: 'completed', customer_id: CUSTOMER_ID,
     amount_paid: paid, amount_left: left, doctor_name: 'Dr. Sara',
@@ -219,4 +230,101 @@ describe('allocation against real bookings', () => {
     expect(fake.rows('reservations').find((r) => r.id === 'res-theirs')!.amount_left).toBe(999);
     expect(fake.rows('customers').find((c) => c.id === 'other')!.outstanding).toBe(999);
   });
+
+  it('settles a targeted reservationId when specified, updating only that reservation', async () => {
+    fake.seed('customers', [{ id: CUSTOMER_ID, outstanding: 500, spent_amount: 0 }]);
+    seedUnpaidBooking('res-older', '2026-01-01', 0, 300);
+    seedUnpaidBooking('res-newer', '2026-02-01', 0, 200);
+
+    // Target the NEWER booking specifically, even though older booking exists
+    const res = await POST(makeReq({ customerId: CUSTOMER_ID, amount: 200, reservationId: 'res-newer' }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.settled).toBe(200);
+
+    // Older booking left untouched
+    expect(fake.rows('reservations').find((r) => r.id === 'res-older')!.amount_left).toBe(300);
+    expect(fake.rows('reservations').find((r) => r.id === 'res-older')!.amount_paid).toBe(0);
+
+    // Newer booking paid in full
+    expect(fake.rows('reservations').find((r) => r.id === 'res-newer')!.amount_left).toBe(0);
+    expect(fake.rows('reservations').find((r) => r.id === 'res-newer')!.amount_paid).toBe(200);
+
+    // Customer balances updated
+    expect(fake.rows('customers')[0].outstanding).toBe(300);
+    expect(fake.rows('customers')[0].spent_amount).toBe(200);
+  });
+
+  it('rejects settling targeted reservation when amount exceeds remaining balance', async () => {
+    fake.seed('customers', [{ id: CUSTOMER_ID, outstanding: 300, spent_amount: 0 }]);
+    seedUnpaidBooking('res-target', '2026-01-01', 0, 200);
+
+    const res = await POST(makeReq({ customerId: CUSTOMER_ID, amount: 250, reservationId: 'res-target' }));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/exceeds.*balance/i);
+    // Booking and customer untouched
+    expect(fake.rows('reservations').find((r) => r.id === 'res-target')!.amount_left).toBe(200);
+    expect(fake.rows('customers')[0].outstanding).toBe(300);
+  });
 });
+
+describe('GET /api/customers/settle-debt', () => {
+  beforeEach(() => {
+    fake.reset();
+    for (const t of ['customers', 'reservations', 'invoices', 'payments', 'employee_accounts', 'roles', 'transactions', 'services']) {
+      fake.seed(t, []);
+    }
+  });
+
+  it('rejects unauthenticated requests with 401', async () => {
+    fake.authGetUser.mockResolvedValue({ data: { user: null }, error: { message: 'jwt expired' } });
+    const res = await GET(makeGetReq('http://localhost:3000/api/customers/settle-debt', false));
+    expect(res.status).toBe(401);
+  });
+
+  it('returns operational status when customerId is omitted (System Test Suite ping)', async () => {
+    seedStaffAuth();
+    const res = await GET(makeGetReq());
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.success).toBe(true);
+    expect(body.status).toBe('operational');
+  });
+
+  it('returns 404 when customer does not exist', async () => {
+    seedStaffAuth();
+    fake.seed('customers', []);
+    const res = await GET(makeGetReq(`http://localhost:3000/api/customers/settle-debt?customerId=non-existent`));
+    expect(res.status).toBe(404);
+  });
+
+  it('returns customer summary and itemized list of unpaid sessions', async () => {
+    seedStaffAuth();
+    fake.seed('customers', [{ id: CUSTOMER_ID, name: 'Layla Ahmed', outstanding: 450, spent_amount: 150 }]);
+    fake.seed('services', [{ id: 10, en: 'Hydrafacial Cleanse' }]);
+    seedUnpaidBooking('res-1', '2026-03-01', 50, 200);
+    fake.db.reservations[0].service_id = 10;
+    seedUnpaidBooking('res-2', '2026-03-15', 0, 250);
+    fake.db.reservations[1].service_id = 10;
+
+    const res = await GET(makeGetReq(`http://localhost:3000/api/customers/settle-debt?customerId=${CUSTOMER_ID}`));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    expect(body.customer).toBeDefined();
+    expect(body.customer.name).toBe('Layla Ahmed');
+    expect(body.customer.outstanding).toBe(450);
+
+    expect(body.unpaidSessions).toHaveLength(2);
+    expect(body.unpaidSessions[0].id).toBe('res-1');
+    expect(body.unpaidSessions[0].amountPaid).toBe(50);
+    expect(body.unpaidSessions[0].amountLeft).toBe(200);
+    expect(body.unpaidSessions[0].serviceName).toBe('Hydrafacial Cleanse');
+
+    expect(body.unpaidSessions[1].id).toBe('res-2');
+    expect(body.unpaidSessions[1].amountPaid).toBe(0);
+    expect(body.unpaidSessions[1].amountLeft).toBe(250);
+  });
+});
+

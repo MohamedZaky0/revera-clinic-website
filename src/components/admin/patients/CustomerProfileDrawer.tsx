@@ -29,6 +29,7 @@ import MedicalFormModal from "@/components/admin/patients/MedicalFormModal";
 import MedicalReportModal from "@/components/admin/patients/MedicalReportModal";
 import ConfirmPackagePriceModal from "@/components/admin/patients/ConfirmPackagePriceModal";
 import AdjustWalletModal, { FinancialMetric } from "@/components/admin/patients/AdjustWalletModal";
+import SettleDebtModal from "@/components/admin/patients/SettleDebtModal";
 import { PatientTransactionsHistoryTab } from "@/components/admin/patients/PatientTransactionsHistoryTab";
 import { NewManualTransactionView } from "@/components/admin/transactions/NewManualTransactionView";
 import type { Customer } from "@/components/admin/patients/useCustomerProfile";
@@ -280,6 +281,7 @@ export default function CustomerProfileDrawer({
   }>({ isOpen: false, initialMetric: "wallet" });
   // DEC-088 item 6: the historical package whose invoice value is being entered (null = modal closed).
   const [confirmPriceFor, setConfirmPriceFor] = React.useState<any>(null);
+  const [showSettleModal, setShowSettleModal] = React.useState(false);
 
   // Laser Pulse Counter Engine states
   const [laserLogs, setLaserLogs] = React.useState<any[]>([]);
@@ -679,6 +681,17 @@ export default function CustomerProfileDrawer({
                     <span>{t.outstanding || "Outstanding"}</span>
                   </span>
                   <div className="flex items-center gap-1.5">
+                    {Number(viewingCustomerProfile.outstanding || 0) > 0 && (!hasPermission || hasPermission("customers.action_settle_balance")) && (
+                      <button
+                        type="button"
+                        onClick={() => setShowSettleModal(true)}
+                        className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-300/70 px-2 py-0.5 rounded-md transition cursor-pointer"
+                        title={lang === "ar" ? "تسوية المديونية" : "Settle Balance"}
+                      >
+                        <ReceiptText size={10} />
+                        <span>{t.settleBalanceBtn || "Settle Balance"}</span>
+                      </button>
+                    )}
                     {adminRole === "superadmin" && (
                       <button
                         type="button"
@@ -957,6 +970,7 @@ export default function CustomerProfileDrawer({
                       const statusClass = getStatusBadgeClass(res.status);
                       const redemptions = customerPackageRedemptions.filter((r: any) => r.reservationId === res.id);
                       const roomName = rooms.find((rm: any) => rm.id === res.roomId)?.name || "—";
+<<<<<<< HEAD
                       // DEC-119: the money columns AND the Payment badge read the stored amount_paid / amount_left
                       // only. The badge used to guess from the catalog price (and a hard-coded fallback price map)
                       // whenever the balance was not stored, so it could disagree with the columns beside it.
@@ -971,7 +985,7 @@ export default function CustomerProfileDrawer({
                           ? "unknown"
                           : money.outstanding <= 0
                             ? "paid"
-                            : money.paid !== null && money.paid > 0
+                            : money.paid !== null && money.paid >= 1
                               ? "partial"
                               : "unpaid";
                       const priceCell =
@@ -2607,6 +2621,36 @@ export default function CustomerProfileDrawer({
             if (typeof fetchCustomers === "function") {
               fetchCustomers();
             }
+          }}
+          lang={lang}
+        />
+      )}
+
+      {/* ── Modal: Settle Balance ── */}
+      {showSettleModal && viewingCustomerProfile && (
+        <SettleDebtModal
+          customer={viewingCustomerProfile}
+          onClose={() => setShowSettleModal(false)}
+          onSettled={async () => {
+            setShowSettleModal(false);
+            if (typeof fetchCustomers === "function") {
+              fetchCustomers();
+            }
+            try {
+              const res = await fetch(`/api/customers?id=${encodeURIComponent(viewingCustomerProfile.id || "")}`, {
+                headers: authenticatedJsonHeaders,
+              });
+              if (res.ok) {
+                const refreshed = await res.json();
+                if (refreshed?.customer) {
+                  setViewingCustomerProfile(refreshed.customer);
+                }
+              }
+            } catch (e) {
+              console.warn("Could not refresh customer profile after settling debt:", e);
+            }
+            window.dispatchEvent(new CustomEvent("revera-booking-change"));
+            window.dispatchEvent(new CustomEvent("revera-transaction-change"));
           }}
           lang={lang}
         />

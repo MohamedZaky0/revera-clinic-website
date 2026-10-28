@@ -2951,7 +2951,9 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     { id: 'TC-099', name: 'Superadmin Booking Status Override Control Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies that interactive booking status overriding is restricted to superadmin role and validates reservation lifecycle transitions.', status: 'idle' },
     { id: 'TC-100', name: 'Clinical Session Financial Isolation & Privacy Engine', category: 'Doctor & Clinical', endpoint: '/api/reservations', description: 'Verifies complete removal of pricing, rate, and monetary settlement details from doctor ongoing session views and receptionist ending session clinical intake, isolating financial calculations to checkout.', status: 'idle' },
     { id: 'TC-101', name: 'Financial Ledger Integrity, Payment Methods & Interactive Till Engine', category: 'Finance & Accounting', endpoint: '/api/transactions', description: 'Verifies Cairo calendar timezone bounds, precision rounding of wallet balances, breakdown lists for today payments, debt, and wallet, automatic reference generation, and checkout payment methods.', status: 'idle' },
-    { id: 'TC-102', name: 'Booking Creation & Checkout Financial Ledger Dual-Write Engine', category: 'Finance & Accounting', endpoint: '/api/reservations', description: 'Verifies service catalog cat schema query, automatic booking payment ledger recording, debt settlement transactions, and cash till reconciliation.', status: 'idle' }
+    { id: 'TC-102', name: 'Booking Creation & Checkout Financial Ledger Dual-Write Engine', category: 'Finance & Accounting', endpoint: '/api/reservations', description: 'Verifies service catalog cat schema query, automatic booking payment ledger recording, debt settlement transactions, and cash till reconciliation.', status: 'idle' },
+    { id: 'TC-103', name: 'Unique Payment Sequence Numbering & Manual Booking Invoice Generation', category: 'Finance & Accounting', endpoint: '/api/invoices?action=next_no', description: 'Verifies sequential atomic invoice/payment reference generation (INV-XXXXXX), preventing duplicated reference numbers across payments and debt settlements, and guaranteeing standard invoice creation for manual bookings.', status: 'idle' },
+    { id: 'TC-104', name: 'Payment Status Calculation & Multi-Session Debt Settlement Engine', category: 'Finance & Accounting', endpoint: '/api/customers/settle-debt', description: 'Verifies strict payment status calculation (Unpaid when 0 EGP paid, Partially Paid strictly when >= 1 EGP paid with remaining balance), zero-debt settlement gating, per-session itemized unpaid breakdown, and targeted session balance settlement.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
@@ -5964,8 +5966,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     fetchAllReservations();
   }, [viewingBooking, authenticatedJsonHeaders, fetchRequests, fetchAllReservations]);
 
-  function handlePrintInvoice(booking: any, servicesList: any[], totalCost: number, walletUsed: number, branchName: string) {
-    printInvoice(booking, servicesList, totalCost, walletUsed, branchName);
+  function handlePrintInvoice(booking: any, servicesList: any[], totalCost: number, walletUsed: number, branchName: string, overrideInvoiceNo?: string) {
+    printInvoice(booking, servicesList, totalCost, walletUsed, branchName, overrideInvoiceNo);
   }
 
   const calendarDays = useMemo(
@@ -10123,7 +10125,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           // A deposit collected at reservation time (BookingModal's "declare deposit paid" step)
           // is already stored on the booking as amountPaid — checkout must charge only what's
           // left of the service price, not the full price again. RISK-029.
-          const depositAlreadyPaid = Number(checkoutBooking.amountPaid) || 0;
+          const depositAlreadyPaid = Number(checkoutBooking.amountPaid ?? (checkoutBooking as any).amount_paid ?? 0);
           const activeCustomerPackageItems = checkoutCustomerPackages
             .filter((pkg: any) => pkg.status === "active" && (!pkg.expiresAt || new Date(pkg.expiresAt) >= new Date()))
             .flatMap((pkg: any) => (pkg.items || []).map((it: any) => ({ ...it, packageName: pkg.packageName })));
@@ -10427,7 +10429,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           const walletDeduction = useWalletBalance ? Math.min(walletBalance, balanceDue) : 0;
           const netDue = Math.max(0, balanceDue - walletDeduction);
 
-          const amountPaidNum = parseFloat(checkoutAmountPaid) || 0;
+          const amountPaidNum = checkoutAmountPaid.trim() !== "" ? (parseFloat(checkoutAmountPaid) || 0) : netDue;
           const diff = amountPaidNum - netDue;
 
           const changeAmount = diff > 0 ? diff : 0;
@@ -11119,7 +11121,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
             const walletUsed = Math.max(0, totalCost - finalPaid - finalLeft);
             const branch = branches.find((b: any) => b.id === invoiceBooking.branchId);
             const branchName = branch ? (isRTL ? branch.name_ar : branch.name_en) : "Revera Zayed Clinic";
-            const invoiceNo = inv.invoice_no || `REV-INV-${String(invoiceBooking.id || '').slice(0, 8).toUpperCase()}`;
+            const invoiceNo = inv.invoice_no || (invoiceBooking as any).invoiceNo || (invoiceBooking as any).invoice_no || `INV-${String(invoiceBooking.id || '').slice(0, 6).toUpperCase()}`;
 
             return (
               <div 
@@ -11269,7 +11271,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                       Close
                     </button>
                     <button
-                      onClick={() => handlePrintInvoice(invoiceBooking, allInvoiceItems, totalCost, walletUsed, branchName)}
+                      onClick={() => handlePrintInvoice(invoiceBooking, allInvoiceItems, totalCost, walletUsed, branchName, invoiceNo)}
                       className="rounded-xl bg-[var(--cr-primary)] px-4 py-2 text-xs font-bold text-[var(--color-brand-light)] hover:bg-[#2e3a26] transition flex items-center gap-1.5 shadow-md cursor-pointer"
                     >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -11593,7 +11595,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           const walletUsed = Math.max(0, totalCost - finalPaid - finalLeft);
           const branch = branches.find(b => b.id === invoiceBooking.branchId);
           const branchName = branch ? (isRTL ? branch.name_ar : branch.name_en) : "Revera Zayed Clinic";
-          const invoiceNo = `REV-INV-${String(invoiceBooking.id || '').slice(0, 8).toUpperCase()}`;
+          const invoiceNo = (invoiceBooking as any).invoiceNo || (invoiceBooking as any).invoice_no || `INV-${String(invoiceBooking.id || '').slice(0, 6).toUpperCase()}`;
 
           return (
             <div 
@@ -11743,7 +11745,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                     Close
                   </button>
                   <button
-                    onClick={() => handlePrintInvoice(invoiceBooking, allInvoiceItems, totalCost, walletUsed, branchName)}
+                    onClick={() => handlePrintInvoice(invoiceBooking, allInvoiceItems, totalCost, walletUsed, branchName, invoiceNo)}
                     className="rounded-xl bg-[var(--cr-primary)] px-4 py-2 text-xs font-bold text-[var(--color-brand-light)] hover:bg-[#2e3a26] transition flex items-center gap-1.5 shadow-md cursor-pointer"
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
