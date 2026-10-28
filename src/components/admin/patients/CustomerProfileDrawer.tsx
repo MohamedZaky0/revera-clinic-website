@@ -970,7 +970,6 @@ export default function CustomerProfileDrawer({
                       const statusClass = getStatusBadgeClass(res.status);
                       const redemptions = customerPackageRedemptions.filter((r: any) => r.reservationId === res.id);
                       const roomName = rooms.find((rm: any) => rm.id === res.roomId)?.name || "—";
-<<<<<<< HEAD
                       // DEC-119: the money columns AND the Payment badge read the stored amount_paid / amount_left
                       // only. The badge used to guess from the catalog price (and a hard-coded fallback price map)
                       // whenever the balance was not stored, so it could disagree with the columns beside it.

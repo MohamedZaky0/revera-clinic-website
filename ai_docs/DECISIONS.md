@@ -3537,9 +3537,6 @@ Investigation revealed:
 
 ---
 
-<<<<<<< HEAD
----
-
 ## DEC-105: Manual Payments & Wallet Movements Reopened — Superadmin Always, Other Roles By Role-Management Grant
 
 **Date:** 2026-10-17
