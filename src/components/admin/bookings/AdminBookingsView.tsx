@@ -519,18 +519,20 @@ export const AdminBookingsView = React.memo(function AdminBookingsView({
       const isExplicitZeroHistorical = isHistorical && ((histInvMatch && Number(histInvMatch[1] || histInvMatch[2]) === 0) || (amtPaid === 0 && (amtLeft === 0 || rawLeft === null || rawLeft === undefined)));
 
       let paySt: string;
-      if (isDeficit) {
-        paySt = "Partially Paid";
-      } else if (isExplicitZeroHistorical || (isHistorical && amtLeft === 0)) {
+      if (isExplicitZeroHistorical || (isHistorical && amtLeft === 0)) {
         paySt = "Paid";
       } else if (rawPaid === null || rawPaid === undefined || Number.isNaN(amtPaid)) {
         paySt = (isPkgCovered || isHistorical) && (st === "completed" || amtLeft === 0) ? "Paid" : "—";
-      } else if (amtPaid <= 0 && amtLeft !== 0 && !isPkgCovered && !isHistorical && st !== "completed") {
-        paySt = "Unpaid";
-      } else if (rawLeft === null || rawLeft === undefined || Number.isNaN(amtLeft)) {
-        paySt = (isPkgCovered || isHistorical) ? "Paid" : "—";
-      } else if (amtLeft > 0) {
+      } else if (amtPaid < 1 && (amtLeft > 0 || !isPkgCovered)) {
+        // If 0 EGP was paid, status is strictly "Unpaid" (even if session started/ended/completed)
+        paySt = (isPkgCovered && (st === "completed" || amtLeft === 0)) ? "Paid" : "Unpaid";
+      } else if (amtLeft !== null && amtLeft !== undefined && amtLeft <= 0) {
+        paySt = "Paid";
+      } else if (amtPaid >= 1 && (amtLeft > 0 || isDeficit)) {
+        // Partially Paid starts strictly when at least 1 EGP is paid and balance remains
         paySt = "Partially Paid";
+      } else if (amtLeft > 0) {
+        paySt = amtPaid >= 1 ? "Partially Paid" : "Unpaid";
       } else {
         paySt = "Paid";
       }

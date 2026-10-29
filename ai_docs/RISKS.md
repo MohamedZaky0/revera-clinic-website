@@ -1,6 +1,6 @@
 # RISKS.md — Revera Clinics Risk Register
 
-> **Last Updated:** 2026-10-21 (docs audit: status index and counts rebuilt, seven entries moved to the section that matches their status; RISK-019 closed through RISK-128)
+> **Last Updated:** 2026-10-26 (RISK-140 added; status counts recounted from the sections). 2026-10-21 (docs audit: status index and counts rebuilt, seven entries moved to the section that matches their status; RISK-019 closed through RISK-128)
 > **Previous content was for a different project — discarded entirely**
 > RISK-010 … RISK-020 were found by the 2026-07-25 finance discovery audit and are the
 > remediation scope of `PROPOSALS.md` → PROPOSAL-002 Phase 0.
@@ -14,7 +14,7 @@
 
 ## Status summary
 
-**9 open** · **13 partially resolved** · **104 resolved** · 126 tracked total.
+**9 open** · **13 partially resolved** · **115 resolved** · 137 tracked total. (Counted from the `## RISK-nnn` sections under each heading below on 2026-10-26: 9 + 13 + 115 = 137. The previous line said 106 / 128 and the Resolved index was missing RISK-130, 131 and 132; all three are listed now.)
 Jump to a section: [Open](#-open--not-yet-resolved) · [Partially Resolved](#-partially-resolved) · [Resolved](#-resolved)
 
 ---
@@ -1266,7 +1266,17 @@ filled in with the above.
 - [RISK-127](#risk-127) — The Doctor Portal Briefly Showed Every Doctor's Patients On First Load (RESOLVED, NOT YET CONFIRMED ON PRODUCTION)
 - [RISK-128](#risk-128) — The Public Browser Key Could Read Staff Accounts, Salaries, Attendance, Prescriptions And More — And Write Or Delete Accounts And Roles (RESOLVED ON DEV AND PRODUCTION; PRODUCTION SCREENS NOT YET RE-CHECKED BY THE OWNER)
 - [RISK-129](#risk-129) — Patients Who Paid Showed "Total Spend 0" (RESOLVED, NOT YET CONFIRMED ON PRODUCTION)
+- [RISK-130](#risk-130) — One Reception Laptop Was Sent To The Login Page At Random: Its Clock Was An Hour Ahead (CAUSE FOUND AND FIXED ON THAT LAPTOP; APP NOW WARNS ABOUT IT)
+- [RISK-131](#risk-131) — Production API Calls To Supabase Stall At Random, So Login And Screens Hang Or Fail (MITIGATED ON DEV; ROOT CAUSE NOT FOUND)
+- [RISK-132](#risk-132) — Total Spend / Outstanding In The Patient Profile Kept Changing Back And Forth (FIXED ON DEV)
 - [RISK-133](#risk-133) — "Hard Delete" Of A Patient Looked Like It Did Nothing: The Patient Came Back From Its Bookings (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
+- [RISK-134](#risk-134) — Every Staff Request Asked The Supabase Auth Server To Check The Login, About 68,000 Auth Requests An Hour, Which Helped Keep The Production Database Unhealthy (RESOLVED ON DEV, NOT YET CONFIRMED ON PRODUCTION)
+- [RISK-135](#risk-135) — Doctors > Attendance Sent The Same Request Over And Over While The Tab Was Open (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER)
+- [RISK-136](#risk-136) — Admin Tabs Polled The Server Around The Clock, Hidden Or Not, And Staff Without Admin Rights Asked For Admin-Only Lists On Every Click (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
+- [RISK-137](#risk-137) — Every Public Page View Cost About 12 API Calls And 15 Database Queries, Nothing Was Cached, And The Booking Popup Loaded Six Reads On Pages That Never Show It (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
+- [RISK-138](#risk-138) — A Patient With Bookings Could Not Be Deleted For Good; The Owner's Rule Is That Permanent Delete Removes Everything (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
+- [RISK-139](#risk-139) — Permanently Deleting A Booking Left Its Payments And Money In The Patient's Figures (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
+- [RISK-140](#risk-140) — Anyone On The Internet Could Read Every Doctor's Phone, Email, National ID And Salary From The Public Doctors Endpoint (RESOLVED ON DEV, NOT YET ON PRODUCTION)
 
 ## RISK-003: Patient Auth Is Non-Functional
 
@@ -5665,4 +5675,226 @@ See `PROPOSALS.md` for:
 
 **To clear the existing "Hamada Test" entry on production:** nothing in this change deletes data. Delete (or cancel) its one booking from the Bookings screen as superadmin and the entry disappears. That booking has 1 transaction linked to it (the transaction stays, with no booking), which is for the owner to accept.
 
+**Decided 2026-10-25 (owner):** a permanent delete removes the patient together with their bookings and payments. The refusal built here (DEC-128) is replaced by DEC-130 / RISK-136; the cause analysis above still holds.
+
+## RISK-134: Every Staff Request Asked The Supabase Auth Server To Check The Login, About 68,000 Auth Requests An Hour, Which Helped Keep The Production Database Unhealthy (RESOLVED ON DEV, NOT YET CONFIRMED ON PRODUCTION)
+
+**Date:** 2026-10-25 · **Related:** RISK-131 / DEC-126 (stall guard), RISK-113 (503 on a transient check failure), RISK-117 (middleware), DEC-117 (inactive accounts), DEC-129
+
+**What was seen:** the production Supabase project (Nano compute) went "Unhealthy" for Auth and the REST API, with about 68,878 Auth requests and 2,799 Auth errors in an hour and about 204,000 REST requests. When Auth is slow, staff see "Could not verify your session right now" or a 401/503 on every screen.
+
+**Why:** every staff API call asked the Auth server "who is this token?" with `auth.getUser(token)` (`requireStaffAccess`, `verifyHrAccess`, `GET /api/auth/me`), and the four protected prefixes asked a second time in `src/middleware.ts` (a hand-written `fetch` to `/auth/v1/user`); the provider create/edit routes asked a third time only to read the caller's e-mail for the audit trail. One admin page load fires many API calls, so one person produced dozens of Auth calls. The stall guard (RISK-131) repeats a slow read up to 3 more times, which multiplies that load when Auth is already struggling.
+
+**Fix (DEC-129):** one shared helper, `src/lib/verifyToken.ts` (`verifyAccessToken`), built on `auth.getClaims()`:
+- ES256 token (what production issues now): verified on the server with the public key (JWKS). **Auth-server calls per request: 0** (one JWKS read per server process per about 10 minutes).
+- HS256 token (only possible from the old, expired signing key, or on a project that never moved to signing keys): `getClaims` still needs one `getUser` call. The helper caches a successful check for 60 s (or until the token expires), bounded to 500 entries, keyed by a hash of the token, and shares one call between simultaneous requests. **At most 1 Auth call per token per minute per server instance.** On a project whose only key is the legacy HS256 secret this change gives no reduction except through that cache.
+- It adds the checks `getClaims` does not make (issuer = this project, audience and role `authenticated`, not an anonymous user, a well-formed `sub`), turns every exception `getClaims` throws on a malformed token into a 401, and rate-limits never-seen key ids (5 per minute, 60 s cooldown) so a flood of made-up tokens cannot become a flood of JWKS/Auth calls. It adds no retry of its own: the client already carries the stall guard, and a second retry layer would multiply calls.
+- Auth or JWKS unreachable, 429 or 5xx -> `unavailable` -> **503** (RISK-113, the session is kept). This now also applies in `requireStaffAccess` and `verifyHrAccess`, which used to answer 401 for it. A short (3 s) memory of "unavailable" stops a burst from each retrying a struggling server.
+- `src/middleware.ts` no longer calls Supabase at all: it refuses a missing, malformed or expired token and leaves the real verification to the handler, which every handler under the four protected prefixes already runs (checked: all 10 route files, every exported method has a guard).
+- `src/app/api/providers/route.ts` POST/PATCH read the caller's e-mail from the access check already done instead of a second `getUser`.
+
+**Not changed on purpose:**
+- The database lookup of the employee row (`is_active`, role) still runs on every request. A valid signature is never treated as permission: an inactive staff member is refused on the very next request (DEC-117), proved by `tests/routes/local-jwt-verification.test.ts` with a token that has a real valid ES256 signature, including when that token's verification is cached.
+- `requireAuthenticatedUser` (patient identity, `/api/customers`) still uses `auth.getUser`: it has no database gate, and it compares the live e-mail/phone. That is one Auth call per such request.
+- Production signing keys: the owner confirmed on 2026-10-25 (dashboard, JWT Signing Keys) that the current key is ECC (P-256), created about 4 months ago, and that the previous key is HS256, still listed under "Previously used keys". Do not revoke the old HS256 key: the legacy `anon` and `service_role` API keys are HS256 JWTs and revoking could break the app.
+
+**Trade-off to know:** a locally verified token cannot see that its session was ended (signed out elsewhere, auth user banned) until the token expires (default 1 hour). For staff the employee row check covers deactivation immediately; for anything not backed by an `employee_accounts` row there is no such backstop. `StaffAccess.user.email` is the token's e-mail at issue time.
+
+**Auth-server calls per request after the change:**
+
+| Path | Before | After |
+|---|---|---|
+| Staff API under the 4 protected prefixes | 2 (middleware + handler) | 0 with an ES256 token; at most 1 per token per minute per instance with an HS256 token |
+| Other staff API (`requireStaffAccess`) | 1 | 0 / at most 1 per token per minute |
+| `GET /api/auth/me` | 1 | 0 / at most 1 per token per minute |
+| Provider create / edit | 2 | 0 / at most 1 per token per minute |
+| Patient identity (`requireAuthenticatedUser`, `/api/customers`) | 1 | 1 (unchanged) |
+| Browser-side Supabase calls (login, token refresh) | unchanged | unchanged |
+
+**Not verified:** the effect on production Auth request counts (needs a deploy and a day of Supabase "Auth" metrics); that `next build` bundles `src/middleware.ts` unchanged on Vercel (the middleware no longer imports Supabase, so this is low risk, but no production build was run in this change); the owner's own admin session on the deployed site.
+
+**Tests:** `tests/lib/verifyToken.test.ts` (real supabase-js `getClaims` with a generated ES256 key and a stubbed network), `tests/routes/local-jwt-verification.test.ts`, `tests/routes/middleware-auth.test.ts`. Manual checklist: `ai_docs/manual_tests/LOCAL_JWT_VERIFICATION_MANUAL_TESTS.md`.
+
+## RISK-135: Doctors > Attendance Sent The Same Request Over And Over While The Tab Was Open (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER)
+
+**Manual test checklist:** `ai_docs/manual_tests/ATTENDANCE_FETCH_LOOP_MANUAL_TESTS.md`
+
+**Severity:** Medium (no wrong data shown; wasted requests, battery and database load for every open tab) · **Type:** Performance / UI state
+**Found:** 2026-10-25, by a code audit (not seen in the browser). The rate is an estimate from the code, not a measurement: roughly one `GET /api/provider-attendance` per render cycle, which the audit put at 60 or more a minute per open tab.
+
+**Cause:** in `src/components/admin/doctor/useProviderForm.ts`, `fetchAttendance` was a plain `async function` declared in the hook body, so it was a new function on every render of the admin page. The effect that loads attendance listed it in its dependencies (`[providerTab, attendanceDate, fetchAttendance]`). The fetch itself sets state (`setLoadingProviderAttendance`, `setAttendanceRecords`), which re-renders the admin page, which created a new `fetchAttendance`, which re-ran the effect, which fetched again, with no end while the Attendance tab was open. The only thing that switches that tab on is the permission effect in the same hook, for staff whose role has `providers.attendance` but not `providers.view` (superadmin and ordinary doctor-list roles never reach it). Because the hook lives in the admin page and the fetch effect does not look at the open screen, the loop kept running on every admin screen after that, not only on Doctors.
+- Only `GET /api/provider-attendance` (PostgREST, read only) was involved. Nothing was written, so no data was changed or lost.
+
+**Fix:** `fetchAttendance` is now stable (`useCallback`), so the effect runs only when the tab or the selected date changes. It also has an in-flight guard: a second call for the same date while one is running is skipped. The refetch after saving an attendance row bypasses that guard (`{ force: true }`) so the table shows the saved row, and only the newest request may write the table, so a slow reply for an older date cannot overwrite the current one. Behaviour is otherwise unchanged (the single load still happens on whichever screen is open once the tab is set; not gated on the open screen, to keep this change minimal).
+
+**Tests:** `tests/components/doctor/useProviderFormAttendance.test.tsx` mounts the hook with a mocked `fetch`: one GET on opening the tab and none after its own re-render, no GET on the Doctors tab, one more GET on a date change, one POST then one GET after a save, overlapping calls skipped, a stale reply ignored. Run against the old code, 6 of its 7 tests fail (the loop never settles).
+
+**Still to do:** confirm in the browser (Network tab on Doctors > Attendance, idle for a minute: one request). The Attendance tab itself is still not shown in the UI (see the "Dead Attendance plumbing" comment in the hook); this fix only stops the requests.
+
+## RISK-136: Admin Tabs Polled The Server Around The Clock, Hidden Or Not, And Staff Without Admin Rights Asked For Admin-Only Lists On Every Click (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
+
+**Manual test checklist:** `ai_docs/manual_tests/PAUSE_HIDDEN_POLLING_MANUAL_TESTS.md`
+
+**Severity:** High while production runs on the small (Nano) database (every API call costs at least one Supabase Auth check, so idle tabs add up) · **Type:** Performance / Operational
+**Found:** 2026-10-25, by a code audit while looking for what drove about 68,000 Auth requests an hour (see RISK-134, which removed the per-request Auth call on the server). The rates below are estimates read from the code, not measurements from production.
+
+**Cause (all four confirmed in the code):**
+1. **Booking poll** (`src/app/admin/page.tsx`, effect "Re-fetch bookings whenever branch selection changes"): a `setTimeout` chain every 15 s, two requests per cycle (`/api/reservations?status=pending&branchId=...` and `/api/reservations?branchId=...`), for every role, with no check of `document.hidden`, and also while the doctor screens were shown (they load their own reservations; the shell's lists were not on screen).
+2. **HR alerts poll** (same file, "Admin Missing Alerts Polling"): `setInterval` every 30 s for superadmin, admin and HR; no hidden-tab pause, no guard against a second request starting before the first answered.
+3. **Doctor poll** (`src/components/admin/DoctorAccountView.tsx`): `GET /api/reservations` every 3 s. It already skipped hidden tabs and overlapping requests. The URL carried `?limit=250`, but `GET /api/reservations` never read `limit`, so the clinic's whole reservation list came back every 3 s. The code comment in that file records that realtime does not reach the browser for this table (row-level security), so the poll is the only way reception's changes arrive.
+4. **Roles and employees for staff who cannot use them** (`fetchRolesAndEmployees` in `page.tsx`): `GET /api/roles` and `GET /api/employees` answer only to `superadmin` and `admin` (`requireAdministratorAccess`). Reception, doctors, HR and custom roles asked anyway on login and again on every navigation click (the effect re-runs while the employee list stays empty), got 403, waited 2 s and asked again: four wasted requests per click.
+
+**Fix:**
+- `src/lib/visiblePoll.ts` (`startVisiblePoll`): runs a task every N ms while the tab is visible; keeps no timer and makes no request while hidden; when the tab is shown again it runs the task once at once if the data is older than one interval (a quick alt-tab does not refetch); never starts a run while the previous one is unfinished. The booking poll (15 s) and the HR alerts poll (30 s, first run immediate) use it. The booking effect now does nothing while the doctor screens are shown and starts again (with a fresh load) when an admin switches back (`showDoctorWorkspace` moved above the effect).
+- Doctor view: interval 3 s -> 15 s (`DOCTOR_POLL_MS`); hidden-tab and in-flight guards unchanged; the refreshes after the doctor's own actions and on the booking/prescription events are unchanged and still immediate. The misleading `?limit=250` was removed (see below).
+- `src/lib/adminDirectory.ts`: `canLoadAdminDirectory(role)` is true only for `superadmin` and `admin`, the two values `/api/auth/me` returns in the same normalised form the server checks. `fetchRolesAndEmployees` does nothing for any other role, and a 401 or 403 is never retried (other failures keep the old single retry after 2 s).
+
+**Estimated requests per minute per tab (from the code):**
+
+| Tab | Before | After |
+|---|---|---|
+| Admin, visible | 8 booking + 2 HR alerts = 10 | 10 (unchanged: still 15 s and 30 s) |
+| Admin, hidden / forgotten overnight | 10 | 0 (one refresh of 3 requests when shown again after 30 s or more) |
+| Doctor screens, visible | 8 shell + 20 doctor = 28 | 4 |
+| Doctor screens, hidden | 8 shell | 0 |
+| Reception, visible and idle | 8 | 8 (hidden: 0) |
+| Reception / doctor, per navigation click | 4 refused requests to roles and employees | 0 |
+
+**Decided not to do: make `GET /api/reservations` honour `limit`.** It is small to build but unsafe with this caller: the route returns the whole clinic and the doctor view picks its own bookings client-side, so a cap of 250 (newest first) would drop a doctor's older or upcoming bookings once the clinic has more than 250. The param was simply removed from the doctor view. A real saving there needs a server-side doctor filter (`doctorId` already exists on the route, but its name matching differs from the view's `isDoctorMatch`), which is a separate change.
+
+**Behaviour change to know about:** a doctor now sees a change made by reception up to 15 s later instead of 3 s (their own actions still refresh at once). If that is too slow in practice, lowering `DOCTOR_POLL_MS` is a one-line change.
+
+**Not changed:** `src/lib/access.ts`, `src/lib/auth.ts`, `src/middleware.ts`, `/api/auth/me`, `src/lib/verifyToken.ts` (RISK-134), the attendance code (RISK-135), the public site; other timers in `page.tsx` (presence check, session retry, checkout) are local or already conditional.
+
+**Tests:** `tests/components/visiblePoll.test.tsx` (interval, hidden tab makes no call and no timer, one refetch on visible, quick alt-tab does not refetch, in-flight guard, disabled poll), `tests/lib/adminDirectory.test.ts` (no request for non-admin roles, no retry after 401/403, one retry otherwise), `tests/lib/pausedPollingWiring.test.ts` (source wiring of the three call sites, since the admin page is too large to mount), and the cadence tests in `tests/components/doctor/DoctorAccountView.test.tsx` were updated from 3 s to 15 s.
+
+**Still to do:** confirm in a real browser with the Network tab (checklist) and, after a deploy, in the Supabase Auth and Vercel request metrics over a day.
+
+## RISK-137: Every Public Page View Cost About 12 API Calls And 15 Database Queries, Nothing Was Cached, And The Booking Popup Loaded Six Reads On Pages That Never Show It (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
+
+**Manual test checklist:** `ai_docs/manual_tests/PUBLIC_READ_CACHING_MANUAL_TESTS.md`
+
+**Severity:** Medium (no wrong data; load on a Nano database that was already unhealthy, see RISK-134) · **Type:** Performance / database load
+**Found:** 2026-10-25, by a code audit. The counts below are counted from the code, not measured on production.
+
+**Cause:**
+- `GlobalBookingModal` is mounted in `src/app/layout.tsx`, so `BookingModal` ran six fetches on mount of every page, `/admin` and `/login` included, while the popup was closed: categories, services, branches, providers, page-settings, terms.
+- `/api/page-settings` was fetched three times per page view (`LanguageProvider`, `Navbar`, `BookingModal`), and `Navbar` fetched it again on every window `focus` and every `visibilitychange`.
+- Every public GET route is `force-dynamic` and the client used `cache: "no-store"`, so every call reached the database. `GET /api/providers` is the heaviest (providers, roles, every non-rejected reservation, and `select *` on `employee_accounts`, which included the base64 national-id images of every employee).
+- Home page, estimate: 12 API calls before (page-settings x3, categories x2, services x3, branches, providers, terms, packages), about 15 PostgREST queries.
+
+**Fix:**
+1. `BookingModal` fetches its six reads only the first time the popup opens (or at once for the `/book` page variant). An "open-booking" event that arrives before categories and services are loaded is held and replayed when they are, so the preselected service and category still work.
+2. `src/lib/publicCache.ts` adds `Cache-Control: public, s-maxage=60, stale-while-revalidate=300` and `Vary: Authorization` to the successful GET of `services`, `categories`, `branches`, `packages`, `terms` and `page-settings`, only when the request carries no `Authorization` header. A request with any `Authorization` header (valid staff token, expired token, junk) gets `private, no-store`. For `page-settings` only the stripped anonymous body of a real database read is cacheable; the staff blob, the seeded-default body and the JSON-file fallback are not. Error and fallback bodies (500, the `[]` fallbacks of `branches` and `categories`) get no cache header. `dynamic = 'force-dynamic'` is kept: it controls Next's own caching and does not remove a `Cache-Control` set on the response.
+3. `cache: "no-store"` is removed from the public site's fetches of categories, services and packages (`HomeServicesSection`, `ServicesSection`, `PackagesSection`, `BookingModal`). Admin screens keep theirs.
+4. `src/lib/publicPageSettings.ts` is one shared read of `/api/page-settings` for `LanguageProvider`, `Navbar` and `BookingModal`: concurrent callers share one request, a copy is reused for 5 minutes, and it is dropped at once on the admin's `revera-settings-change` event, the cross-tab storage event and the `BroadcastChannel` message. `Navbar` no longer refetches on focus unless the copy is older than 5 minutes, and ignores `visibilitychange` to hidden.
+5. `GET /api/providers`: `employee_accounts` is read with the seven columns the auto-sync uses instead of `select *`.
+
+**Not changed on purpose:**
+- `GET /api/providers` is **not** given a cache header. It returns staff-only fields (`fixedSalary`, `nationalId`, `commission*`) to anyone, and the admin Doctors screen (`useProviderForm`) reads it without an `Authorization` header, so a public cache would also hand those fields to the CDN and a caller cannot be told apart as staff or public. For the same reason the per-doctor `bookings` count (a read of every non-rejected reservation) is kept: the staff Doctors table shows it.
+- `availability` (depends on live reservations), `rooms`, `service-rooms` and `customer-avatars` (patient id to photo map) are not cached; none is read on a normal public page view.
+
+**Impact now (estimate):** home page 12 calls become 5 (page-settings once, categories, services x2, packages) and, within 60 s of another visitor, those are answered by the CDN without a database query; any other page makes 1 call (page-settings), or 3 on the services page. Opening the booking popup adds 5 more on first open (page-settings reused). Window focus makes none inside 5 minutes.
+
+**New finding, not fixed here (follow-up, owner decision needed):** `GET /api/providers` exposes salary, national id and commission settings to any anonymous caller. Fixing it means sending the staff token from `useProviderForm` and returning a public subset otherwise. **Closed by RISK-140 / DEC-134.**
+
+**Staleness (accepted):** a CMS edit (service, price, category, branch, package, terms, page settings) can take up to 60 s to reach visitors on a fresh page load. With `stale-while-revalidate` the first request after 60 s may still be answered with the old copy while the CDN refreshes (up to 300 s past expiry), and an already-open tab keeps its page-settings copy for up to 5 minutes (zero in the browser that made the save). Staff screens that read these routes WITH a token always get fresh data. Staff screens that read them without a token (for example the New Booking screen's `/api/packages`) can see a copy up to 60 s old after an edit.
+
+**Tests:** `tests/routes/public-read-caching.test.ts` (header on anonymous GET, absence with a junk token and with a staff token, unchanged JSON, no header on error or fallback, providers uncached), `tests/components/BookingModalLazyLoad.test.tsx` (no fetch on mount while closed, six on first open and none on the second, `/book` loads at once, deferred open is replayed), `tests/components/publicPageSettings.test.tsx` (shared in-flight request, 5-minute TTL, invalidation, no failure caching).
+
+**Still to do:** confirm on a Vercel preview that the response headers reach the browser and that `x-vercel-cache` shows HIT for the anonymous request; run the manual checklist.
+
+## RISK-138: A Patient With Bookings Could Not Be Deleted For Good; The Owner's Rule Is That Permanent Delete Removes Everything (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
+
+**Manual test checklist:** `ai_docs/manual_tests/PATIENT_HARD_DELETE_EVERYTHING_MANUAL_TESTS.md`
+
+**Severity:** Medium (permanent data loss by design, so the safeguards matter) · **Type:** Data integrity / product rule
+**Found:** 2026-10-25. After DEC-128 / RISK-133 a superadmin got a refusal for every patient that had a booking, which made test patients impossible to remove. The owner decided that a permanent delete must remove the patient with everything that belongs to them.
+
+**Cause of the old behaviour:** on production every table pointing at `customers` is `ON DELETE SET NULL` (`reservations`, `transactions`, `invoices`, `product_sales`) or `ON DELETE CASCADE` (`customer_packages`, `customer_product_balances`, `laser_pulse_logs`, `medical_records`, `medical_reports`, `prescriptions`, `wallet_txns`; checked with a SELECT on `pg_constraint`, none of the foreign keys to `customers`, `reservations`, `invoices` or `transactions` restricts a delete). A plain delete of the row un-linked the bookings, and the Patients list rebuilds a patient from any booking with no patient row (`res-cust-<phone>`).
+
+**Fix:** DEC-132 (supersedes DEC-128). Bookings, payments and the other records are deleted explicitly before the patient row; un-linked bookings with the patient's phone and name go too; the delete is retryable if a step fails; the dialog shows the counts first.
+
+**Risks that remain, by design:**
+- No undo. A mis-clicked permanent delete loses the bookings, payments and medical records of that patient. Mitigation: only a superadmin, the counts are shown first and a second confirm is required. Soft Delete is still the way to hide a patient and keep the history.
+- Finance figures that sum payments change after a delete (the patient's income is gone). Inventory is not restored.
+- The delete is a sequence of requests, not one transaction: a failure part-way leaves a patient with part of the data removed (and a 500 naming the step); running the delete again finishes it.
+- Un-linked bookings with the patient's phone but a clearly different name are kept, so such a patient can still show up as a separate entry; the dialog says how many.
+- This also deletes real patients' history if a superadmin picks the wrong one: the dialog lists what is removed, but staff must read it.
+
 **Open (owner decision):** whether a permanent delete should be able to remove a patient together with their bookings and payments (for test data). Not built: it would erase income and visit history with no way back. Options: (a) keep as is, test data is cleaned by deleting its bookings first; (b) a separate superadmin-only "delete test patient and everything" action that lists what will be erased and asks to type the patient's name.
+
+## RISK-139: Permanently Deleting A Booking Left Its Payments And Money In The Patient's Figures (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
+
+**Manual test checklist:** `ai_docs/manual_tests/BOOKING_HARD_DELETE_CASCADE_MANUAL_TESTS.md`
+
+**Severity:** High (wrong money on a patient, no data lost) · **Type:** Data integrity
+**Found:** 2026-10-25, reported by the owner (superadmin) on production for the patient "hazem al hadary" (`e428fecd-3aa9-4a2f-86e3-31f21edc0350`): after hard-deleting the patient's bookings from the Bookings screen, Total Spend 2,700, Outstanding 2,920 and "Bookings 3" were still shown.
+
+**Cause (code and production SELECTs only):** the route ran `delete from reservations where id = ...`. `transactions.reservation_id` and `invoices.reservation_id` are `ON DELETE SET NULL`, so the payments (TXN-001073 amount 1200, TXN-001074 amount 1500) and the booking invoices (3 invoices, 2 payments) stayed as orphans. `customers.spent_amount` / `outstanding` / `number_of_bookings` are running totals moved by deltas in several routes and nothing moved them back. The Patients list falls back to the stored count when a patient has no bookings left, and shows the larger of the stored and the booking-derived money (DEC-121), so the stored leftovers were what stayed on screen. The orphan invoices also keep counting in finance reports (receivables aging reads issued invoices by patient), and Settle Debt would still offer to settle them.
+
+**Fix:** DEC-133 (no migration).
+
+**Left over on production for this patient (nothing was changed by this fix, the owner decides):** 0 bookings; customers row `spent_amount` 2700, `outstanding` 2920, `number_of_bookings` 3; 2 transactions with no booking (TXN-001073, TXN-001074); 3 invoices with no booking (INV-000083 1200, INV-000084 1600, INV-000121 2820) with 2 payments (1200, 1500); 3 wallet entries (5520 in, 100 out, 5420 out; wallet balance 0); 3 active customer packages. The new delete would have taken these out with each booking; for the ones already deleted they have to be cleaned by hand (or a one-off script the owner approves).
+
+**Still open (follow-ups, not guessed):**
+1. Pulse (laser) package usage and package usage entered on previous (historical) bookings are not given back when the booking is deleted (no receipt row ties them to the booking). Only sessions consumed through `consume_customer_package_session` are.
+2. The wallet is not reversed (the booking row does not hold what wallet credit it used).
+3. The delete is an ordered sequence with undo, not one database transaction. A stalled write (RISK-131) can in theory leave an undo undone; the answer says so (`partial`). A Postgres function would make it atomic.
+4. `product_sales` rows of a previous booking's products are not linked to the booking and stay.
+---
+
+## RISK-140: Anyone On The Internet Could Read Every Doctor's Phone, Email, National ID And Salary From The Public Doctors Endpoint (RESOLVED ON DEV, NOT YET ON PRODUCTION)
+
+**Manual test checklist:** `ai_docs/manual_tests/PROVIDERS_PUBLIC_PROJECTION_MANUAL_TESTS.md`
+
+**Severity:** High (personal data and pay of every doctor, readable without a login) · **Type:** Security / data exposure
+**Found:** 2026-10-25, first noted as a follow-up in RISK-137 and confirmed from the code by the owner's assistant. Status: **RESOLVED ON DEV, NOT YET ON PRODUCTION.** Production still serves the old response until this branch is deployed.
+
+**What was wrong:** `GET /api/providers` had no authentication check and returned the full mapped row of every doctor to any caller: `phone`, `email`, `nationalId`, `fixedSalary`, `commissionType`, `commissionValue`, `commissionBase`, `commissionFixedComponent`, `serviceCommissions`, `age`, `gender`, `startDate`, the whole `workingDaysHours` JSON (which also holds `email`, `employment_type`, `languages`, `session_type`) and the per-doctor `bookings` count. The public booking popup needs only a few of those fields. The admin Doctors screen called it without a token, which is why it had never been locked down.
+
+**It also exposed staff:** every doctor is also an employee, so the salaries and national ids of the doctors on the payroll were visible to anonymous visitors. **Assume the data may already have been collected**: the URL is guessable and was open to scripts, and the app did not record who read it. Whether anyone did cannot be established from the code. Nothing needs to be rotated (no password or key was in the response), but the owner should be told, and the doctors whose national ids and phone numbers were exposed should be told if the clinic's privacy obligations require it. Also check Vercel runtime logs for unusual volume on `/api/providers` if the retention allows.
+
+**Fix:**
+1. `GET /api/providers` decides the caller first. With an `Authorization` header it runs `requireStaffAccess`; a valid staff token gets the full response, byte for byte as before (same fields, same `bookings` counts, same auto-sync). No header, a junk or expired token (401), a valid token of a non-staff user or an inactive staff account (403) all get the public projection, never a 401. If the token check itself fails (500/503) the route answers that error rather than the public list, so a staff screen cannot silently show salaries as 0 and then save them.
+2. `src/lib/publicProvider.ts` is the public projection, an explicit allow-list: `id, name, specialty, image, services, rating, active, branchId, workingDaysHours`. The schedule is rebuilt key by key (branch ids, branch schedules, `in_person` / `online`, per weekday `isOpen`, `start`, `end`, `shifts`), so the `email` / `languages` / `session_type` stored beside it are not sent. A new database column can never reach the public by accident. It is derived from what `BookingModal` reads (`id`, `name`, `services`, `branchId`, `workingDaysHours`) plus `specialty`, `image`, `rating` and `active` for the site.
+3. The anonymous path reads only the `providers` table. The all-reservations count, the `employee_accounts` read and the **employee-to-provider auto-sync** (an INSERT on a public GET) now run for staff callers only. The auto-sync was never needed by the public path: `POST`/`PATCH /api/employees` already create the provider row when a doctor employee is saved. The auto-sync is the safety net for rows that got no provider (for example a role switched to a doctor workspace), and it still runs as soon as any staff member has the admin open, because the admin loads `/api/providers` with a token on start. **Consequence to know about:** such a doctor now becomes bookable on the public site when a staff member next opens the admin, not on the next public page view. The auto-created row has no services and no schedule, so the booking popup treats it as available on any day; creating it from a public page view was itself a risk.
+4. Cache: the anonymous projection uses the public header (`public, s-maxage=60, stale-while-revalidate=300`, `Vary: Authorization`, same helper as services and categories); any request with an `Authorization` header, staff included, is `private, no-store`. The local-JSON fallback and error bodies are never shared-cacheable, and the fallback goes through the same allow-list.
+5. `useProviderForm.fetchProviders` (the only staff caller) now sends the bearer token, read with `getAuthHeaders()` when the call runs. It must not use the `authenticatedJsonHeaders` prop: the mount effect calls `fetchProviders` before the session state is filled, so that closure holds `Bearer ` with no token and would get the public list.
+
+**Public callers (unchanged, they send no token):** `BookingModal` (`src/components/BookingModal.tsx`, mounted globally and on `/book`). No other `src/` caller of `GET /api/providers` exists; the admin New Booking screen reads `providers` through the browser Supabase client instead (see SECURITY.md section 6).
+
+**Not fixed / still open:**
+- Any staff account (reception included) still receives the full response, salaries too. This change separates staff from the public, not staff roles from each other. Narrowing by permission is a product decision.
+- `AdminNewBookingView` reads `providers` straight from Supabase with the browser key. Whether an anonymous holder of that key can read the table depends on RLS on production, which was not checked here. RISK-136 notes it returned empty on the test database.
+- `scratch/doctor-view-tests.mjs` and `scratch/test-apis.mjs` call the endpoint anonymously; they only count rows or print status and are unaffected.
+
+**Tests:** `tests/routes/providers-public-projection.test.ts` (exact key set, no secret strings anywhere in the JSON including nested schedule fields, junk / empty / expired / patient / inactive-staff tokens get the projection, staff gets the full response with bookings counts, auto-sync still inserts for staff and never for anonymous, anonymous reads only the `providers` table, 503 is not degraded, a new column does not leak), `tests/components/doctor/useProviderFormToken.test.tsx` (the Doctors list fetch carries the Authorization header even while the `session` prop is null). `tests/routes/public-read-caching.test.ts` was changed: its providers block asserted the leak (an anonymous call returned `fixedSalary` and `nationalId` with no cache header); it now asserts the projection, the public header for anonymous callers, and `private, no-store` plus the unchanged full row for staff.
+
+**Still to do:** run the manual checklist in the browser (anonymous curl, and the Doctors screen as staff), deploy, then repeat the anonymous curl against production and confirm no salary or national id comes back. Tell the owner about the exposure window.
+
+## RISK-141: Historical-Booking Packages Were Reconstructed From `notes` Text Instead Of A Real Id (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER; MIGRATION UNAPPLIED)
+
+**Manual test checklist:** `ai_docs/manual_tests/RISK_141_PACKAGE_REAL_ID_MANUAL_TESTS.md`
+
+**Severity:** Medium (one user-facing crash + a wrong-data class identical to RISK-038/057) · **Type:** Data integrity / schema
+**Found:** 2026-10-25, owner report: Edit Previous Booking on a package booking failed with `Could not load packages: invalid input syntax for type uuid: "pkg-0"`. Same defect class RISK-038 and RISK-057 already fixed for products — there, three independent regex parsers reconstructed the same fact from free text; here the Edit form parsed `Package: <name>` out of `reservations.notes` and fuzzy-matched the name against the catalog and the patient's packages.
+
+**Causes found:**
+1. `reservation_products` had no `package_id`/`customer_package_id` columns — POST wrote `description: 'Package: <name>'` and dropped the real ids.
+2. `PATCH /api/reservations/previous` never wrote `reservation_products` at all.
+3. The Edit form reconstructed attached packages by regex-parsing `notes` and name-matching; an unmatched name (renamed/deleted package) fabricated `pkg-<n>` and sent it as a real `packageId`, crashing on Postgres `22P02` — surfaced verbatim to the user.
+
+**Fix (Brief 37, branch `feat/brief-37-package-id`; stopgap also cherry-picked to `dev` directly):**
+- **Part D (on `dev`, `9a99e34`):** cherry-picked `0c17d2a` — no fabricated id, unmatched packages filtered out of the save with a warning card, and `22P02` on the catalog lookup gets the same friendly message the `customer_packages` branch already had. Crash gone immediately.
+- **Part A (migration `20261026000000…`, UNAPPLIED — owner applies):** `package_id uuid → packages(id)` and `customer_package_id uuid → customer_packages(id)`, both `ON DELETE SET NULL`, on `reservation_products`. `DB_SCHEMA.md` updated in the same commit.
+- **Part B:** POST step 7c writes both ids; new PATCH step 10a syncs package lines — deletes `line_type='additional_service'` rows with `package_id` set *and* legacy `description ILIKE 'Package:%'` rows (prevents duplicates when editing a pre-migration booking), then re-inserts one line per attached package. Non-fatal warnings, same as POST.
+- **Part C:** `mapReservationProduct()` exposes `packageId`/`customerPackageId`; `AdminAddPreviousBookingView` builds attached packages from those ids when present (catalog name/lookup by id — a renamed package shows its current name), notes-regex demoted to fallback only for pre-migration rows.
+
+**Tests:** extended `tests/routes/reservations-previous-package.test.ts` (+2) and `reservations-previous-edit.test.ts` (+2); 35/35 in those files. `tsc` clean; eslint 0 new errors (4 pre-existing `prefer-const`, 2 pre-existing render-purity errors on dev unchanged).
+
+**Not done / still open:**
+- Migration `20261026000000…` is **unapplied** — Part B/C's new columns no-op until the owner applies it; the notes fallback covers reads until then, and writes carry NULL ids (same as today).
+- Identical gap for **products** (Edit checks `product_ids`/`productIds`/`.products` but the API field is `attachedProducts`, so products also fall through to notes-regex 100% of the time) and for **products/services sync on PATCH** — reported to Mohamed, needs its own brief (wider blast radius, per the brief's out-of-scope).
+- POST step 7a writes `line_type: 'service'` for the primary service — rejected by the CHECK constraint (`product`/`additional_service`/`device_pulses` only) and swallowed by the unchecked `await`; primary-service line rows are likely never written. Reported, not fixed.
+- No backfill of pre-migration rows — they stay `NULL`, the notes fallback covers display. No browser verification yet.

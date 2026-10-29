@@ -59,13 +59,14 @@ function mapReservationProduct(p: Record<string, any>) {
   };
 }
 
-function mapRow(r: Record<string, any>, attachedProducts?: Array<Record<string, any>>) {
+function mapRow(r: Record<string, any>, attachedProducts?: Array<Record<string, any>>, invoiceNo?: string | null) {
   const serviceIds = Array.isArray(r.service_ids) ? r.service_ids : [];
   if (serviceIds.length === 0 && r.service_id) {
     serviceIds.push(r.service_id);
   }
   return {
     id: r.id,
+    invoiceNo: invoiceNo ?? r.invoice_no ?? r.invoiceNo ?? null,
     serviceId: r.service_id,
     serviceIds: serviceIds,
     date: fmtDate(r.date),
@@ -526,29 +527,58 @@ async function writeCheckoutInvoice(params: {
   const allLines = [...lines, ...addonLines];
   const totals = buildInvoiceTotals(allLines);
 
-  // Atomic — public.next_invoice_no() wraps nextval(invoice_no_seq) server-side
-  // (20260726010600_create_next_invoice_no_rpc.sql). PostgREST has no generic way to call the
-  // built-in nextval() directly, and reading "last invoice_no + 1" client-side would race
-  // under concurrent checkouts and violate invoices.invoice_no's UNIQUE constraint.
-  const { data: seqValue, error: seqErr } = await supabaseServer.rpc('next_invoice_no');
-  if (seqErr) throw seqErr;
-  const invoiceNo = formatInvoiceNo(Number(seqValue));
-
-  const { data: invoice, error: invoiceErr } = await supabaseServer
+  // Check if an invoice already exists for this reservation (e.g. from manual booking)
+  const { data: existingInvoices } = await supabaseServer
     .from('invoices')
-    .insert({
-      invoice_no: invoiceNo,
-      reservation_id: reservationId,
-      customer_id: customerId,
-      branch_id: branchId,
-      subtotal: totals.subtotal,
-      discount_total: totals.discountTotal,
-      grand_total: totals.grandTotal,
-      status: 'issued',
-    })
-    .select('id')
-    .single();
-  if (invoiceErr) throw invoiceErr;
+    .select('id, invoice_no, grand_total, subtotal, discount_total, status')
+    .eq('reservation_id', reservationId)
+    .order('created_at', { ascending: false })
+    .limit(1);
+  const existingInvoice = existingInvoices && existingInvoices.length > 0 ? existingInvoices[0] : null;
+
+  let invoice: any = existingInvoice;
+  let invoiceNo = existingInvoice?.invoice_no;
+
+  if (!invoice) {
+    // Atomic — public.next_invoice_no() wraps nextval(invoice_no_seq) server-side
+    // (20260726010600_create_next_invoice_no_rpc.sql). PostgREST has no generic way to call the
+    // built-in nextval() directly, and reading "last invoice_no + 1" client-side would race
+    // under concurrent checkouts and violate invoices.invoice_no's UNIQUE constraint.
+    const { data: seqValue, error: seqErr } = await supabaseServer.rpc('next_invoice_no');
+    if (seqErr) throw seqErr;
+    invoiceNo = formatInvoiceNo(Number(seqValue));
+
+    const { data: newInvoice, error: invoiceErr } = await supabaseServer
+      .from('invoices')
+      .insert({
+        invoice_no: invoiceNo,
+        reservation_id: reservationId,
+        customer_id: customerId,
+        branch_id: branchId,
+        subtotal: totals.subtotal,
+        discount_total: totals.discountTotal,
+        grand_total: totals.grandTotal,
+        status: 'issued',
+      })
+      .select('id, invoice_no')
+      .single();
+    if (invoiceErr) throw invoiceErr;
+    invoice = newInvoice;
+  } else {
+    // Re-synchronize existing invoice totals with completed settlement
+    await supabaseServer
+      .from('invoices')
+      .update({
+        subtotal: totals.subtotal,
+        discount_total: totals.discountTotal,
+        grand_total: totals.grandTotal,
+        status: 'issued',
+      })
+      .eq('id', invoice.id);
+
+    // Delete provisional lines so authoritative lines with costing can be inserted
+    await supabaseServer.from('invoice_lines').delete().eq('invoice_id', invoice.id);
+  }
 
   const { data: invoiceLines, error: linesErr } = await supabaseServer.from('invoice_lines').insert(
     allLines.map((line: ReturnType<typeof buildInvoiceLine>) => ({ ...line, invoice_id: invoice.id }))
@@ -577,12 +607,50 @@ async function writeCheckoutInvoice(params: {
     console.error('Failed to write Phase 2 checkout costing (non-fatal):', costingError, '| reservation:', reservationId);
   }
 
-  if (amountPaid > 0) {
+  // Calculate new money collected at checkout
+  const newMoneyAtCheckout = amountPaid - Math.max(0, priorPaid);
+
+  // Determine unique receipt/payment reference for this checkout payment.
+  // Every payment MUST have its own unique sequence reference (INV-XXXXXX) so multiple
+  // installments/payments on the same reservation never duplicate invoice numbers.
+  let checkoutPaymentRef = paymentReference || null;
+  if (!checkoutPaymentRef) {
+    if (priorPaid > 0) {
+      const { data: seqVal } = await supabaseServer.rpc('next_invoice_no');
+      if (seqVal != null) {
+        checkoutPaymentRef = formatInvoiceNo(Number(seqVal));
+      } else {
+        checkoutPaymentRef = invoiceNo;
+      }
+    } else {
+      checkoutPaymentRef = invoiceNo;
+    }
+  }
+
+  // Query existing payments on this invoice to avoid double-recording
+  const { data: existingPayments } = await supabaseServer
+    .from('payments')
+    .select('id, amount')
+    .eq('invoice_id', invoice.id);
+  const totalExistingPayments = (existingPayments || []).reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
+
+  if (totalExistingPayments > 0) {
+    if (newMoneyAtCheckout > 0) {
+      const { error: paymentErr } = await supabaseServer.from('payments').insert({
+        invoice_id: invoice.id,
+        amount: newMoneyAtCheckout,
+        method: paymentMethod || 'cash',
+        reference: checkoutPaymentRef,
+        received_by_employee_id: receivedByEmployeeId || null,
+      });
+      if (paymentErr) throw paymentErr;
+    }
+  } else if (amountPaid > 0) {
     const { error: paymentErr } = await supabaseServer.from('payments').insert({
       invoice_id: invoice.id,
       amount: amountPaid,
       method: paymentMethod || 'cash',
-      reference: paymentReference || null,
+      reference: checkoutPaymentRef,
       received_by_employee_id: receivedByEmployeeId || null,
     });
     if (paymentErr) throw paymentErr;
@@ -602,10 +670,13 @@ async function writeCheckoutInvoice(params: {
       invoiceId: invoice.id,
       reservationId,
       paymentMethod: 'none',
+      referenceNo: invoiceNo,
       createdByEmployeeId: receivedByEmployeeId || null,
+      status: 'completed',
+      source: 'automatic',
     });
   }
-  const newMoneyAtCheckout = amountPaid - Math.max(0, priorPaid);
+
   if (newMoneyAtCheckout > 0) {
     await recordTransaction({
       type: 'payment',
@@ -618,8 +689,10 @@ async function writeCheckoutInvoice(params: {
       invoiceId: invoice.id,
       reservationId,
       paymentMethod: paymentMethod || 'cash',
-      referenceNo: paymentReference || null,
+      referenceNo: checkoutPaymentRef,
       createdByEmployeeId: receivedByEmployeeId || null,
+      status: 'completed',
+      source: 'automatic',
     });
   }
 }
@@ -642,20 +715,32 @@ export async function appendPaymentToExistingInvoice(
 ): Promise<boolean> {
   if (amount <= 0) return false;
 
-  const { data: invoice, error: findErr } = await supabaseServer
+  const { data: invoices, error: findErr } = await supabaseServer
     .from('invoices')
     .select('id, invoice_no, customer_id, branch_id')
     .eq('reservation_id', reservationId)
-    .eq('status', 'issued')
-    .maybeSingle();
-  if (findErr) throw findErr;
+    .order('created_at', { ascending: false })
+    .limit(1);
+  if (findErr) {
+    console.error('appendPaymentToExistingInvoice find invoice error:', findErr);
+    return false;
+  }
+  const invoice = invoices && invoices.length > 0 ? invoices[0] : null;
   if (!invoice) return false;
+
+  let effectiveRef = paymentReference || null;
+  if (!effectiveRef) {
+    const { data: seqVal } = await supabaseServer.rpc('next_invoice_no');
+    if (seqVal != null) {
+      effectiveRef = formatInvoiceNo(Number(seqVal));
+    }
+  }
 
   const { error: paymentErr } = await supabaseServer.from('payments').insert({
     invoice_id: invoice.id,
     amount,
     method: paymentMethod || 'cash',
-    reference: paymentReference || null,
+    reference: effectiveRef,
     received_by_employee_id: receivedByEmployeeId || null,
   });
   if (paymentErr) throw paymentErr;
@@ -672,8 +757,10 @@ export async function appendPaymentToExistingInvoice(
     invoiceId: invoice.id,
     reservationId,
     paymentMethod: paymentMethod || 'cash',
-    referenceNo: paymentReference || null,
+    referenceNo: effectiveRef,
     createdByEmployeeId: receivedByEmployeeId || null,
+    status: 'completed',
+    source: 'automatic',
   });
   return true;
 }
@@ -825,6 +912,22 @@ export async function GET(req: Request) {
       }
     }
 
+    const invoicesByReservation = new Map<string, string>();
+    if (reservationIds.length > 0) {
+      const { data: invRows, error: invError } = await supabaseServer
+        .from('invoices')
+        .select('reservation_id, invoice_no')
+        .in('reservation_id', reservationIds)
+        .order('created_at', { ascending: false });
+      if (!invError && invRows) {
+        for (const inv of invRows) {
+          if (inv.reservation_id && !invoicesByReservation.has(inv.reservation_id)) {
+            invoicesByReservation.set(inv.reservation_id, inv.invoice_no);
+          }
+        }
+      }
+    }
+
     const servicesMap = new Map((servicesResult.data || []).map((s: any) => [s.id, s.price]));
     const mappedRows = (resResult.data || []).map((r: any) => ({
       ...r,
@@ -832,7 +935,7 @@ export async function GET(req: Request) {
     }));
 
     return NextResponse.json(
-      mappedRows.map((r: any) => mapRow(r, attachedProductsByReservation.get(r.id) || []))
+      mappedRows.map((r: any) => mapRow(r, attachedProductsByReservation.get(r.id) || [], invoicesByReservation.get(r.id) || null))
     );
   } catch (err) {
     console.error('GET /api/reservations error:', err);
@@ -1262,8 +1365,85 @@ export async function POST(req: Request) {
       );
       throw error;
     }
+    let generatedInvoiceNo: string | null = null;
+    let invoiceRecord: any = null;
+
+    if (isManualBooking) {
+      try {
+        const { data: seqValue, error: seqErr } = await supabaseServer.rpc('next_invoice_no');
+        if (!seqErr && seqValue != null) {
+          generatedInvoiceNo = formatInvoiceNo(Number(seqValue));
+
+          const invLines = fetchedSvcs.map((svc: any) => {
+            const priceDetails = getServicePriceDetails(
+              { price: svc.price !== null ? Number(svc.price) : 0, branchPricing: svc.branch_pricing },
+              targetBranchName
+            );
+            return buildInvoiceLine({
+              lineType: 'service',
+              description: svc.en || svc.ar || `Service #${svc.id}`,
+              qty: 1,
+              unitPrice: priceDetails.basePrice,
+              discount: priceDetails.basePrice - priceDetails.discountedPrice,
+              serviceId: svc.id,
+              providerId: data.provider_id ?? undefined,
+            });
+          });
+
+          if (invLines.length === 0 && servicePrice > 0) {
+            invLines.push(buildInvoiceLine({
+              lineType: 'service',
+              description: `Service #${data.service_id}`,
+              qty: 1,
+              unitPrice: servicePrice,
+              discount: 0,
+              serviceId: data.service_id,
+              providerId: data.provider_id ?? undefined,
+            }));
+          }
+
+          const totals = buildInvoiceTotals(invLines);
+          const { data: createdInv, error: invErr } = await supabaseServer
+            .from('invoices')
+            .insert({
+              invoice_no: generatedInvoiceNo,
+              reservation_id: data.id,
+              customer_id: data.customer_id,
+              branch_id: data.branch_id,
+              subtotal: totals.subtotal,
+              discount_total: totals.discountTotal,
+              grand_total: totals.grandTotal,
+              status: initialAmountPaid >= totals.grandTotal && totals.grandTotal > 0 ? 'paid' : 'issued',
+            })
+            .select('id, invoice_no')
+            .single();
+
+          if (!invErr && createdInv) {
+            invoiceRecord = createdInv;
+            if (invLines.length > 0) {
+              await supabaseServer.from('invoice_lines').insert(
+                invLines.map((line) => ({ ...line, invoice_id: createdInv.id }))
+              );
+            }
+          }
+        }
+      } catch (invErr) {
+        console.error('Failed to create manual booking invoice (non-fatal):', invErr);
+      }
+    }
+
     if (initialAmountPaid > 0) {
       try {
+        const paymentRef = body.paymentReference || generatedInvoiceNo || null;
+        if (invoiceRecord) {
+          await supabaseServer.from('payments').insert({
+            invoice_id: invoiceRecord.id,
+            amount: initialAmountPaid,
+            method: body.paymentMethod || 'cash',
+            reference: paymentRef,
+            received_by_employee_id: data.created_by_employee_id || null,
+          });
+        }
         const svcNames = fetchedSvcs.map((s: any) => s.en || s.ar || `Service #${s.id}`).join(' + ') || `Service #${data.service_id}`;
         await recordTransaction({
           type: 'payment',
@@ -1271,9 +1451,10 @@ export async function POST(req: Request) {
           description: `Booking payment for ${data.name || 'Patient'} (${svcNames})`,
           customerId: data.customer_id,
           branchId: data.branch_id,
+          invoiceId: invoiceRecord?.id || null,
           reservationId: data.id,
           paymentMethod: body.paymentMethod || 'cash',
-          referenceNo: body.paymentReference || null,
+          referenceNo: paymentRef,
           createdByEmployeeId: data.created_by_employee_id || null,
           status: 'completed',
           source: 'automatic',
@@ -1309,10 +1490,11 @@ export async function POST(req: Request) {
       }
     }
 
-    const mapped = mapRow(data);
+    const mapped = mapRow(data, undefined, generatedInvoiceNo);
     const requiresDeposit = !isManualBooking && depositPercentage > 0;
     return NextResponse.json({
       ...mapped,
+      invoiceNo: generatedInvoiceNo || mapped.invoiceNo || null,
       requiresDeposit,
       status: requiresDeposit ? 'pending_deposit' : mapped.status,
     }, { status: 201 });
@@ -2175,13 +2357,28 @@ export async function PATCH(req: Request) {
               paymentReference: paymentReference || null,
             });
           } else if (wasAlreadyCompleted && paymentDelta > 0) {
-            await appendPaymentToExistingInvoice(
+            const appended = await appendPaymentToExistingInvoice(
               id,
               paymentDelta,
               createdByEmployeeId || null,
               paymentMethod || 'cash',
               paymentReference || null
             );
+            if (!appended) {
+              await recordTransaction({
+                type: 'outstanding_payment',
+                amount: paymentDelta,
+                description: `Balance settlement for reservation ${id.slice(0, 8)}`,
+                customerId: target.customer_id,
+                branchId: updated.branch_id ?? target.branch_id ?? null,
+                reservationId: id,
+                paymentMethod: paymentMethod || 'cash',
+                referenceNo: paymentReference || null,
+                createdByEmployeeId: createdByEmployeeId || null,
+                status: 'completed',
+                source: 'automatic',
+              });
+            }
           }
         } catch (invoiceErr) {
           console.error('Failed to write Phase 1 invoice (dual-write, non-fatal):', invoiceErr, '| reservation:', id);
@@ -2209,6 +2406,10 @@ export async function PATCH(req: Request) {
           customerId: target.customer_id || null,
           branchId: updated.branch_id ?? null,
           reservationId: id,
+          paymentMethod: paymentMethod || 'cash',
+          referenceNo: paymentReference || null,
+          status: 'completed',
+          source: 'automatic',
         });
       }
 

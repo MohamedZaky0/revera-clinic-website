@@ -1,8 +1,8 @@
 # API_CONTRACT.md — Revera Clinics API Endpoints
 
-> **Last Updated:** 2026-08-29 (`/api/customers/settle-debt` added; `/api/transactions*` corrected — RISK-076)
+> **Last Updated:** 2026-10-21 (audit: every route handler on `dev` is now documented, 84 of 84; the entries after the `Routes documented late` heading were added then; `/api/health/supabase`, `/api/auth/me` and `/api/roles` corrected)
 > **Base:** Next.js App Router API routes under `/app/api/`
-> **Auth:** Server-side bearer-token validation is enabled on selected sensitive routes (including employee, role, payroll, reservation PATCH/DELETE, product-sales mutations, every Phase 3 expenses/assets/loans route, and every Phase 4 `/api/finance/*` reporting route — each additionally gated on a specific `finance.*` permission via `hasFinancePermission`, not just staff membership); coverage is not yet universal. All routes use the Supabase service role key server-side
+> **Auth:** every route checks access in its own handler (staff, administrator, superadmin, finance permission, HR role, or the caller's own identity); a few are public on purpose (catalog reads, availability). `SECURITY.md` §3 is the method-by-method table; this file names the gate in each entry only where it matters. All routes use the Supabase service role key server-side.
 > **Previous content was for a different project — discarded entirely**
 
 ---
@@ -18,9 +18,9 @@
 
 ## GET /api/health/supabase
 
-Diagnostics: checks which Supabase env vars are present and previews their values.
+Administrator only. Diagnostics: checks which Supabase env vars are present and which variable name supplied each, and does a one-row `services` read to confirm the connection. Secret values are never echoed; only the URL has a short `valuePreview`.
 
-**Response:** `{ supabaseUrl: {...}, serviceRoleKey: {...}, anonKey: {...} }`
+**Response:** `{ ok, connected, timestamp, checks: { supabaseUrl: { present, source, valuePreview }, supabaseSecret: { present, source }, supabasePublishable: { present, source } }, sample }`; on failure `{ ok: false, connected: false, error, checks }` with `500`.
 
 ---
 
@@ -99,6 +99,8 @@ Starts or ends receptionist daily shift attendance persisted to `hr_attendance` 
 
 ## GET /api/branches
 
+**Cache (RISK-137 / DEC-131):** an anonymous GET answers `Cache-Control: public, s-maxage=60, stale-while-revalidate=300` and `Vary: Authorization`; a request with any `Authorization` header answers `private, no-store`. Error responses carry no cache header. A CMS edit can take up to 60 s to reach visitors.
+
 Returns all branches ordered by `sort_order`.
 
 **Response:** `Branch[]`
@@ -125,6 +127,8 @@ Deletes a branch by ID.
 
 ## GET /api/categories
 
+**Cache (RISK-137 / DEC-131):** an anonymous GET answers `Cache-Control: public, s-maxage=60, stale-while-revalidate=300` and `Vary: Authorization`; a request with any `Authorization` header answers `private, no-store`. Error responses carry no cache header. A CMS edit can take up to 60 s to reach visitors.
+
 Returns all categories ordered by `sort_order`.
 
 **Response:** `CategoryRow[]` — `{ key, en, ar, sortOrder }`
@@ -150,6 +154,8 @@ Deletes a category by its key.
 ---
 
 ## GET /api/services
+
+**Cache (RISK-137 / DEC-131):** an anonymous GET answers `Cache-Control: public, s-maxage=60, stale-while-revalidate=300` and `Vary: Authorization`; a request with any `Authorization` header answers `private, no-store`. Error responses carry no cache header. A CMS edit can take up to 60 s to reach visitors.
 
 Returns all services ordered by `sort_order`.
 
@@ -182,11 +188,28 @@ Deletes a service by numeric ID.
 
 ## GET /api/providers
 
-Returns all providers ordered by name. Auto-syncs any `employee_accounts` row that looks like a
-doctor (`department`/`role_name` matching `%doc%`) into `providers` if missing. Falls back to
+**Two responses, chosen by the caller (RISK-140 / DEC-134).** No `Authorization` header, a junk or
+expired token, a valid token of a non-staff user and an inactive staff account get the **public
+projection**. A valid staff token gets the **full response**. If the token check itself fails (500/503)
+the route returns that error, never a reduced list.
+
+**Public response:** `PublicProvider[]` — exactly `{ id, name, specialty, image, services, rating,
+active, branchId, workingDaysHours }`, built by `mapPublicProvider` (`src/lib/publicProvider.ts`) as an
+allow-list. `workingDaysHours` keeps only `branch_ids`, `branch_schedules[branchId]`, the `in_person` /
+`online` maps and, per weekday, `isOpen`, `start`, `end`, `shifts[{start,end}]`; the `email`,
+`employment_type`, `languages`, `session_type` that POST/PATCH stash in that column are dropped.
+No phone, email, national id, salary, commission, age, gender, start date or booking count. Reads only
+the `providers` table and writes nothing. **Cache:** `Cache-Control: public, s-maxage=60,
+stale-while-revalidate=300` + `Vary: Authorization` for a request with no `Authorization` header;
+`private, no-store` when one is present. The local-JSON fallback goes through the same allow-list and is
+never cached.
+
+**Full (staff) response, cache `private, no-store`:** returns all providers ordered by name. Auto-syncs
+any `employee_accounts` row that is a doctor (doctor-workspace role or `is_also_doctor`, DEC-113/114)
+into `providers` if missing (staff callers only; it used to run on every public view). Falls back to
 `data/providers.json` on DB error (empty by default).
 
-**Response:** `ProviderRow[]` — `{ id, name, bookings, services, more, rating, image, phone, email,
+**Response (staff):** `ProviderRow[]` — `{ id, name, bookings, services, more, rating, image, phone, email,
 employmentType, languages, sessionType, active, gender, age, specialty, nationalId,
 workingDaysHours, branchId, startDate, fixedSalary, commissionType, commissionValue,
 commissionBase, commissionFixedComponent, serviceCommissions }`. Note: `email`/`employmentType`/
@@ -241,6 +264,8 @@ delete require `requireSuperadminAccess` — an `admin` is refused, not just non
 ---
 
 ## GET /api/page-settings
+
+**Cache (RISK-137 / DEC-131):** only the stripped anonymous body of a database read is cached (`public, s-maxage=60, stale-while-revalidate=300`, `Vary: Authorization`). Any request with an `Authorization` header (the full staff blob included) answers `private, no-store`; the seeded-default and JSON-file fallback bodies carry no cache header.
 
 Returns the `value` JSONB of the `page_settings` row with `key='home'`. Seeds defaults if empty. Falls back to `data/page_settings.json` on DB error.
 
@@ -389,9 +414,9 @@ public booking payment-declaration flow; every other PATCH shape requires staff 
 
 ## DELETE /api/reservations?id={id}
 
-Deletes a reservation. Pass `id=all` to delete all reservations.
+Superadmin only. `mode=soft` cancels the booking and changes nothing else. `mode=hard` (the default) permanently deletes ONE booking and, in the same call (DEC-133), the booking's payment rows (`transactions`, except wallet-type rows), its ledger invoice(s) with their payments and lines, gives back package sessions it consumed through `consume_customer_package_session`, and takes the booking's share out of the patient's `spent_amount` / `outstanding` / `number_of_bookings` (never below 0). Wallet is not touched. Pass `id=all` to delete all reservations (no cascade: payments and patient figures are not touched).
 
-**Response:** `{ success: true, message: "..." }`
+**Response (hard, one booking):** `{ success: true, message, removed: { transactions: [{ id, transactionId, type, amount }], transactionsTotal, walletTransactionsKept, invoices: [{ id, invoiceNo }], payments, packageSessionsRestored }, customer: { id, before: {spent, outstanding, bookings}, after: {...} } | null, warnings?: string[] }`. Errors: `404` booking not found; `409` `PATIENT_FIGURES_CHANGED` (the patient's figures changed while deleting, nothing changed, retry); `500` a step failed (earlier steps are undone, `partial: true` + `undoFailures` if an undo failed). Other modes: `{ success: true, message: "..." }`.
 
 ---
 
@@ -551,6 +576,8 @@ sensible defaults for missing ones).
 ---
 
 ## GET /api/packages
+
+**Cache (RISK-137 / DEC-131):** an anonymous GET answers `Cache-Control: public, s-maxage=60, stale-while-revalidate=300` and `Vary: Authorization`; a request with any `Authorization` header answers `private, no-store`. Error responses carry no cache header. A CMS edit can take up to 60 s to reach visitors.
 
 Public — no auth check, same convention as `GET /api/services` (returns everything unfiltered;
 active/`showOnWebsite` filtering for the public site happens client-side in `PackagesSection.tsx`).
@@ -787,7 +814,11 @@ Required: `name`, `mobile`. If `id` is present, updates the existing customer. O
 
 Deletes a customer profile record. **Added 2026-09-30 (was missing):** both soft and hard delete
 require `requireSuperadminAccess` — an `admin` is refused (since commit `0976a72`, 2026-09-10; see
-`SECURITY.md` and `RISKS.md` RISK-078). **Changed 2026-10-25 (DEC-128, RISK-133):** `mode=hard` no longer un-links bookings. It answers `409` `{ error, code: "PATIENT_HAS_HISTORY", blockers: { bookings, payments, packages, walletEntries, productBalances, laserSessions, clinicalRecords } }` and changes nothing when the patient has any of those; `404` when the patient does not exist; `500` if the database removed no row. Otherwise it deletes the row and then the linked Supabase Auth user (by `auth_user_id`, else by e-mail/phone; never a staff login). An id of the form `res-cust-<phone>` (a patient shown only because of bookings, no row) answers `409` `PATIENT_IS_BOOKING_DERIVED` with `blockers.bookings`, for soft and hard alike; `400` for any other non-UUID id. `mode=soft` answers `404` when the patient does not exist.
+`SECURITY.md` and `RISKS.md` RISK-078). **Changed 2026-10-25 (DEC-134, RISK-140; supersedes DEC-128):** `mode=hard` deletes the patient together with everything that belongs to them, in this order: transactions, invoice payment rows, invoices, product sales, wallet entries, packages, product balances, laser logs, medical records, medical reports, prescriptions, bookings (linked ones, plus un-linked ones that carry the patient's phone and name when no other patient row owns that phone), then the patient row, then the linked Supabase Auth user (by `auth_user_id`, else by e-mail/phone; never a staff login). Answers `200 { message, removed: { bookings, payments, paymentsAmount, packages, walletEntries, productBalances, laserSessions, clinicalRecords }, keptBookingsOtherName }`; `404` when the patient does not exist; `500 { code: "PATIENT_DELETE_FAILED", failedStep, removedSoFar, error }` when a step fails (the patient row is still there, run it again). An id of the form `res-cust-<phone>` (no patient row): `mode=hard` deletes the un-linked bookings with that phone and their transactions/invoices and answers the same `200` shape (`404` if none is left, `409 PATIENT_RECORD_EXISTS` if a patient row now owns the phone); `mode=soft` answers `409 PATIENT_IS_BOOKING_DERIVED` with `blockers.bookings`; `400` for any other non-UUID id. `mode=soft` answers `404` when the patient does not exist.
+
+### GET /api/customers?id={id}&deletePreview=1
+
+Superadmin only, read only. Returns what a hard delete would remove: `{ patientId, derived, name, counts: { bookings, payments, paymentsAmount, packages, walletEntries, productBalances, laserSessions, clinicalRecords }, keptBookingsOtherName }`. `id` may be a patient UUID or `res-cust-<phone>`. Same `404` / `400` / `409 PATIENT_RECORD_EXISTS` answers as the delete; `403` for a non-superadmin. The admin delete dialog shows it before the second confirm.
 
 **Response:** `{ message: "Customer deleted successfully" }`
 
@@ -943,9 +974,15 @@ Returns all roles with their permission arrays.
 
 Creates or updates a role.
 
-**Body:** `{ id?, name, permissions }`
+**Body:** `{ id?, name, permissions, workspace? ('standard' | 'doctor') }` — `workspace` decides which screens the role lands on (DEC-113); omitted keeps the stored value.
 
 **Response:** Upserted role
+
+---
+
+## PATCH /api/roles
+
+Superadmin only. Locks or unlocks a role. **Body:** `{ name, locked: boolean }`. Core system roles cannot be unlocked (`400`); `404` if the role does not exist. **Response:** the updated role.
 
 ---
 
@@ -1062,7 +1099,7 @@ Verifies the Bearer JWT and returns the employee's role + permissions from `empl
 
 **Headers:** `Authorization: Bearer <supabase-jwt>`
 
-**Response:** `{ user, employee, role, permissions }`
+**Response:** `{ id, role, department, workspace ('standard' | 'doctor'), isAlsoDoctor, permissions, email, employeeId }`. `workspace` is the role's explicit workspace (DEC-113) and `isAlsoDoctor` the account flag (DEC-114). `403` with `code: "account_inactive"` for an inactive account (DEC-117); `503` when Supabase auth cannot be reached right now, so the client keeps the session (RISK-113).
 
 ---
 
@@ -2070,5 +2107,235 @@ Consumes pulses included in a patient's active package.
 }
 ```
 
+---
 
+# Routes documented late (2026-10-21 audit)
+
+These routes existed before this section was written; the contract was out of date for them. Each entry was written from
+the handler on `dev` (methods, who may call, parameters, response keys). Who may call each one, method by method, is in
+`SECURITY.md` §3. Errors are `{ error }` as everywhere else.
+
+## GET /api/profile
+
+Staff. The signed-in person's **own** employee row and, when they are a doctor, their provider row. Takes no id: the identity is
+the bearer token (RISK-128). The provider is matched strictly (same id, phone, national id, or exact normalised name; exactly
+one match, otherwise `null`).
+
+**Response:** `{ employee, provider }` — `employee` is the `employee_accounts` row plus `branch_ids` and `working_days_hours` / `workingDaysHours` (saved schedule); `provider` is a `providers` row or `null`. `404` if the employee record is missing.
+
+---
+
+## GET /api/profile/attendance?from={YYYY-MM-DD}&to={YYYY-MM-DD}
+
+Staff. The caller's own `hr_attendance` rows between two dates, newest first. `400` if either date is missing or not ISO. Admin / HR read everyone's through `/api/hr/attendance`.
+
+**Response:** array of `hr_attendance` rows.
+
+---
+
+## GET /api/profile/payroll?from={YYYY-MM-DD}&to={YYYY-MM-DD}&view=doctor|staff
+
+Staff. What the profile screen needs for the caller's pay summary and target progress. `view=doctor` counts the money collected on bookings assigned to the caller, anything else (`staff`) the bookings the caller created; only `completed`, `confirmed`, `approved` and `started` bookings, summed by `amount_paid`. The month of `from` selects the `doctor_payroll` row.
+
+**Response:** `{ employee, provider, doctorPayroll, targetRevenue }` (`provider` and `doctorPayroll` may be `null`).
+
+---
+
+## GET /api/invoices?reservationId={id}
+
+Staff. The latest non-void invoice for a booking, with its lines and bilingual item names (the immutable ledger data written at checkout, RISK-010).
+
+**Response:** `{ invoice: { id, invoice_no, reservation_id, customer_id, branch_id, issued_at, subtotal, discount_total, grand_total, status } | null, lines: [{ id, line_type, service_id, product_id, description, qty, unit_price, discount, line_total, nameEn, nameAr }] }`. `400` without `reservationId`.
+
+---
+
+## POST /api/reservation-products
+
+Staff. Adds a line (product, additional service or device pulses) to a booking as a real `reservation_products` row (DEC-042). Deducts product stock. If the booking is already `completed` and has an issued invoice, the line is also added to that invoice. It does **not** change `amount_paid` / `amount_left`; the caller does that with a separate `PATCH /api/reservations`.
+
+**Body:** `{ reservationId, lineType: 'product'|'additional_service'|'device_pulses', description, productId?, serviceId?, qty?, unitPrice?, addedByRole? ('doctor_session' default) }`
+
+**Response:** `{ id, name, qty, unitPrice, total, addedBy }`. `404` if the booking does not exist.
+
+---
+
+## GET /api/reservations/laser-deficit?reservationId={id}
+## POST /api/reservations/laser-deficit
+
+Staff. Reception checkout is the only place a laser-pulse deficit is settled (Brief 35, DEC-079). GET previews: delivered pulses, source package, already-consumed amount, deficit, resolved rate and the resolution state. POST resolves it with `{ reservationId, choice: 'BUY_NEW_PACKAGE' | 'PAY_PER_PULSE', packageId?, sourceCustomerPackageId?, paymentMethod?, amountPaid? }`. The client sends no amounts: pulses, balance, package price and rate are all re-resolved on the server. Idempotent per reservation (`reservations.laser_deficit_resolution`).
+
+---
+
+## Rooms
+
+### GET /api/rooms
+**Public.** All rooms with branch names. **Response:** array of `{ id, name, type, status, branchId, branchNameEn, branchNameAr, createdAt }`.
+
+### POST /api/rooms
+Staff. **Body:** `{ name, type, branchId, status? ('available' default) }`. **Response:** created room, `201`. `400` when a required field is missing.
+
+### PATCH /api/rooms?id={id}
+Staff. Same body fields as POST; send what changes. **Response:** updated room.
+
+### DELETE /api/rooms?id={id}
+Staff. **Response:** `{ success: true, message }`.
+
+---
+
+## Service ↔ room mappings
+
+### GET /api/service-rooms?serviceId={id}&roomId={id}
+**Public.** Both filters optional. **Response:** array of `{ service_id, room_id }`.
+
+### POST /api/service-rooms
+Staff. Replaces a mapping set, in one of two shapes: `{ serviceId, roomIds: [...] }` (all rooms of one service) or `{ roomId, serviceIds: [...] }` (all services of one room). The existing rows for that service / room are deleted first. `400` if neither shape is sent.
+
+---
+
+## Terms and conditions
+
+### GET /api/terms?active_only={true}
+
+**Cache (RISK-137 / DEC-131):** an anonymous GET answers `Cache-Control: public, s-maxage=60, stale-while-revalidate=300` and `Vary: Authorization`; a request with any `Authorization` header answers `private, no-store`. Error responses carry no cache header. A CMS edit can take up to 60 s to reach visitors.
+**Public** (the public Terms page). **Response:** `{ terms: [...] }`.
+
+### POST /api/terms
+Administrator. Creates an item. `400` unless the English title and content are present. **Response:** `{ term }`.
+
+### PUT /api/terms
+Administrator. Updates one item (`id`), or reorders when the body is an array of `{ id, sort_order }`. **Response:** `{ term }` or `{ success: true }`.
+
+### DELETE /api/terms?id={id}
+Administrator. **Response:** `{ success: true }`.
+
+---
+
+## Employee notes
+
+### GET /api/employees/notes?employeeId={id}
+Administrator. Notes about one employee, newest first, each with `creator: { id, name } | null`.
+
+### POST /api/employees/notes
+Administrator. **Body:** `{ employeeId, note, createdBy? }`. **Response:** the created note with `creator`, `201`.
+
+### DELETE /api/employees/notes?id={id}
+Administrator. **Response:** `{ success: true }`.
+
+---
+
+## Provider schedule audit logs
+
+### GET /api/providers/schedule-audit-logs
+Staff. All `provider_schedule_audit_logs` rows, newest first (an empty array if the table cannot be read).
+
+---
+
+## HR (HR access = superadmin, admin or hr role, `verifyHrAccess`)
+
+### GET /api/hr/payroll
+HR. Staff payroll rows with the employee joined. Doctors, and employees flagged `is_also_doctor`, are left out: they are paid through Doctor Payroll (DEC-113, DEC-114).
+
+### POST /api/hr/payroll
+HR. **Body:** `{ month: 'YYYY-MM' }`. Runs payroll for every non-doctor employee account; rows already paid are skipped. **Response:** `{ success, count, skippedPaid }`.
+
+### PATCH /api/hr/payroll
+HR. **Body:** `{ id, bonuses?, deductions?, status? }`. Recomputes the net pay. **Response:** the updated row; `404` if not found.
+
+### GET /api/hr/leaves
+HR. Leave requests with the employee joined, newest first.
+
+### POST /api/hr/leaves
+Any staff (self-service). **Body:** `{ employeeId, leaveType, startDate, endDate, reason? }`. Counts the days inclusively and stores status `Pending`. **Response:** the created request, `201`.
+
+### PATCH /api/hr/leaves
+HR. **Body:** `{ id, status, approvedBy? }`. **Response:** the updated request.
+
+### GET /api/hr/performance
+HR. Reviews with employee and reviewer joined, newest first.
+
+### POST /api/hr/performance
+HR. **Body:** `{ employeeId, reviewerId, rating, comments?, goals? }`; the review date is today. **Response:** the created review, `201`.
+
+### DELETE /api/hr/performance?id={id}
+HR. **Response:** `{ success: true }`.
+
+### GET /api/hr/alerts
+HR. Unresolved missing-check-in alerts with the employee joined.
+
+### POST /api/hr/alerts
+Any staff (self-service). **Body:** `{ employeeId }`. Logs a missing-check-in alert. **Response:** the alert, `201`.
+
+### PATCH /api/hr/alerts
+HR. **Body:** `{ id, resolved }`. **Response:** the updated alert.
+
+---
+
+## Customer avatars
+
+### GET /api/customer-avatars?id={customerId}
+**Public.** With `id`: `{ id, avatar_url }`; without: the whole map `{ [customerId]: url }`. Stored in `page_settings` under key `customer_avatars`.
+
+### POST /api/customer-avatars
+Staff. **Body:** `{ id, avatar_url }`; an empty `avatar_url` removes the avatar. **Response:** `{ success, id, avatar_url }`.
+
+---
+
+## Medical records
+
+Staff only (PHI, RISK-080).
+
+### GET /api/medical-records?customerId={id}&reservationId={id}
+Intake records and uploaded reports for a patient (optionally narrowed to one booking). Both `customerId` / `customer_id` spellings are accepted.
+
+### POST /api/medical-records
+**Body:** `{ type: 'form' | 'report', customerId, ... }` plus either the intake fields (`recordData`) or the report fields (`reportData`); `reservationId` optional. `form` (default) upserts the patient's intake form; `report` adds an uploaded report. `400` without a customer id.
+
+### DELETE /api/medical-records?reportId={id}
+Deletes one uploaded report.
+
+### GET | POST | PUT | DELETE /api/medical-records/templates
+Intake form templates mapped per service, in the `medical_record_templates` table only (RISK-086; no local file). GET takes `serviceId` (templates that apply to that service); an empty table is seeded once with the three built-in defaults. POST body: `{ title, description?, service_ids[], fields[], is_default? }`; PUT updates by `id`; DELETE takes `id` / `templateId`. Setting `is_default` clears it on the others.
+
+---
+
+## POST /api/inventory/devices/{id}/reset-pulses
+
+Staff. Resets a device's pulse counter and writes a `device_maintenance_history` row. **Body:** `{ reason, performedBy, notes?, resetToZero? }`.
+
+---
+
+## POST /api/translate
+
+Staff. Translates text through Google Translate's public endpoint. **Body:** `{ text, from? ('auto'), to? ('ar') }`. **Response:** `{ translation, translatedText }`. `400` without `text`.
+
+---
+
+## Finance reports added after the first Phase 4 write-up
+
+All are `GET`, need a staff token plus the permission shown, and take `branchId?` with either `period=YYYY-MM` or `from` / `to` (inclusive dates), unless noted.
+
+- **GET /api/finance/capacity** — `finance.view_capacity` (or `reports.view_analytics`). Per branch and clinic-wide: room / doctor / bottleneck minutes, booked minutes, utilisation, no-show rate. **Response:** `{ range, branchId, assumedOpenMinutesPerDay, note, clinicWide, byBranch }`. Booked minutes read 0 before 2026-07-29 (`completed_at` was added then, no backfill).
+- **GET /api/finance/service-mix** — `finance.view_margins` (or `reports.view_financial_reports`). Break-even revenue, services ranked by contribution margin per bottleneck minute, the greedy-optimal allocation, maximum potential revenue and the gap decomposed into idle capacity, suboptimal mix and no-show loss. **Response:** `{ range, branchId, note, breakEven, rankedServices, capacity, allocation, maxPotentialRevenue, actualServiceRevenue, gapToPotential, gapDecomposition }`. The demand cap per service is the period's actual delivered sessions, not a forecast.
+- **GET /api/finance/revenue-bridge** — `finance.view_pnl`. Cash received in the period (payments on live issued invoices, as `cashflow`) and how much of it paid for packages (deferred, DEC-088 item 9). **Response:** `{ range, branchId, cashReceived, packageCashReceived }`. Opening (historical) invoices are excluded.
+- **GET /api/finance/deferred-packages** — `finance.view_pnl`. No parameters. The deferred package balance as of now: money collected for services not yet delivered, by pulses and by sessions per service, plus packages whose price is still pending. **Response:** `{ asOf, ... }` from `computeDeferredBreakdown`.
+
+---
+
+## Prescriptions
+
+Staff only. Manages digital clinical prescriptions and immutable version history (DEC-137, TC-056, TC-105).
+
+### GET /api/prescriptions
+Fetches prescriptions. Supports querying by booking (`bookingId`), customer (`customerId`), and session date (`date`). If `bookingId` yields no record, automatically falls back to finding the customer's prescription for the given date.
+- **Query Params:** `bookingId` (optional), `customerId` (optional), `date` (optional), `includeHistory` (boolean, default false).
+- **Response:** `{ prescriptions: Prescription[] }` or array of prescriptions.
+
+### POST /api/prescriptions
+Creates or updates (versions) a digital clinical prescription.
+- **Body:** `{ booking_id?, customer_id, customer_name, doctor_id, doctor_name, diagnosis, medications, instructions, follow_up_date?, follow_up_notes?, id? }`.
+- **Behavior:**
+  - If `id` is provided, versions the existing prescription: creates new row with `version = previous.version + 1`, `is_latest = true`, linking `parent_prescription_id` and `root_prescription_id`, and setting previous to `is_latest = false`.
+  - Safely handles non-UUID `booking_id` (strips from Supabase insert if non-UUID to prevent Postgres `22P02` syntax error, while preserving `booking_id` in API response and local JSON fallback).
+  - Automatically updates `reservations.follow_up_date` if follow-up is specified and `booking_id` is a valid UUID.
+- **Response:** `{ success: true, prescription: Prescription }`.
 

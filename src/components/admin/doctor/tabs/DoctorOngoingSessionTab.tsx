@@ -297,7 +297,13 @@ export default function DoctorOngoingSessionTab({
       try {
         const headers = await getAuthHeaders();
         const bookingId = activeSessionBooking.id;
-        const res = await fetch(`/api/prescriptions?booking_id=${encodeURIComponent(bookingId)}`, { headers });
+        const custId = activeSessionBooking.customerId || (activeSessionBooking as any).customer_id || "";
+        const bookingDate = activeSessionBooking.date || "";
+        const params = new URLSearchParams();
+        if (bookingId) params.set("booking_id", String(bookingId));
+        if (custId) params.set("customer_id", String(custId));
+        if (bookingDate) params.set("date", String(bookingDate));
+        const res = await fetch(`/api/prescriptions?${params.toString()}`, { headers });
         if (res.ok) {
           const data = await res.json();
           const rxList = Array.isArray(data) ? data : data.prescriptions || [];
@@ -797,6 +803,45 @@ export default function DoctorOngoingSessionTab({
                     deviceId: selectedDeviceId,
                     deviceName: devicesList.find(d => String(d.id) === String(selectedDeviceId))?.name,
                   };
+
+                  // Auto-save unsaved prescription details entered during the session
+                  const validMeds = rxMedications.filter((m) => m.name.trim() !== "");
+                  if (rxDiagnosis.trim() || validMeds.length > 0 || rxGeneralNotes.trim() || (rxHasFollowUp && rxFollowUpDate)) {
+                    try {
+                      const headers = await getAuthHeaders();
+                      const payload: Record<string, any> = {
+                        booking_id: activeSessionBooking.id,
+                        customer_id: activeSessionBooking.customerId || (activeSessionBooking as any).customer_id || null,
+                        patient_name: activeSessionBooking.name || (activeSessionBooking as any).customer_name || "Patient",
+                        customer_name: activeSessionBooking.name || (activeSessionBooking as any).customer_name || "Patient",
+                        doctor_name: activeSessionBooking.doctorName || null,
+                        diagnosis: rxDiagnosis,
+                        medications: validMeds,
+                        instructions: rxGeneralNotes,
+                        general_notes: rxGeneralNotes,
+                        date: activeSessionBooking.date || new Date().toISOString().slice(0, 10),
+                      };
+                      if (existingRxId) {
+                        payload.id = existingRxId;
+                      }
+                      if (rxHasFollowUp && rxFollowUpDate) {
+                        payload.follow_up_date = rxFollowUpDate;
+                      }
+                      if (rxHasFollowUp && rxFollowUpNotes) {
+                        payload.follow_up_notes = rxFollowUpNotes;
+                      }
+                      const rxRes = await fetch("/api/prescriptions", {
+                        method: "POST",
+                        headers,
+                        body: JSON.stringify(payload)
+                      });
+                      if (rxRes.ok && typeof window !== "undefined") {
+                        window.dispatchEvent(new CustomEvent("revera-prescription-change"));
+                      }
+                    } catch (rxErr) {
+                      console.warn("Auto-saving prescription on treatment completion failed:", rxErr);
+                    }
+                  }
 
                   await handleCompleteTreatment(activeSessionBooking, totalSessionPulses, laserPulseData);
                 }}

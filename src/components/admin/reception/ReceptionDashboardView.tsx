@@ -383,11 +383,6 @@ export default function ReceptionDashboardView({
   const isInProgress = rawStatus === "started" || rawStatus === "in_progress";
   const isCompleted = rawStatus === "ended" || rawStatus === "completed";
 
-  // Branch Name resolution
-  const displayBranchName = lang === "ar" 
-    ? (dashboardData?.receptionist?.branchNameAr || activeBranchNameAr)
-    : (dashboardData?.receptionist?.branchNameEn || activeBranchName);
-
   // Formatted current date
   const todayFormatted = useMemo(() => {
     const d = new Date();
@@ -461,7 +456,15 @@ export default function ReceptionDashboardView({
         doctorSpecialty: r.specialty || "Specialist",
         doctorImage: null,
         service: r.serviceName || r.service || (r.serviceId ? `Service #${r.serviceId}` : "Consultation"),
-        paymentStatus: (r.amountPaid && Number(r.amountPaid) > 0) || (r.amountLeft !== null && Number(r.amountLeft) === 0 && (r.status === 'completed' || r.laserPaymentMode === 'PACKAGE' || r.laser_payment_mode === 'PACKAGE' || r.packageId || r.customerPackageId || String(r.notes || '').includes('Package'))) ? "Paid" : (r.amountLeft && Number(r.amountLeft) > 0 ? "Partial" : "Unpaid"),
+        paymentStatus: (() => {
+          const p = Number(r.amountPaid || r.amount_paid || 0);
+          const l = r.amountLeft !== null && r.amountLeft !== undefined ? Number(r.amountLeft) : (r.amount_left !== null && r.amount_left !== undefined ? Number(r.amount_left) : null);
+          const isPkg = Boolean(r.laserPaymentMode === 'PACKAGE' || r.laser_payment_mode === 'PACKAGE' || r.packageId || r.customerPackageId || String(r.notes || '').includes('Package'));
+          if (l !== null && l <= 0) return "Paid";
+          if (isPkg && (r.status === 'completed' || l === 0)) return "Paid";
+          if (p >= 1 && (l === null || l > 0)) return "Partial";
+          return "Unpaid";
+        })(),
         amountPaid: Number(r.amountPaid || r.amount_paid || 0),
         amountLeft: Number(r.amountLeft || r.amount_left || 0),
         totalPrice: Number(r.cost || r.totalPrice || r.amountPaid || 0),
@@ -520,10 +523,7 @@ export default function ReceptionDashboardView({
           <div className="h-9 w-9 rounded-xl bg-[#F0F4EC] text-[var(--cr-primary)] flex items-center justify-center shrink-0">
             <Calendar size={18} />
           </div>
-          <div>
-            <p className="text-xs font-bold text-[var(--cr-dark)]">{todayFormatted}</p>
-            <p className="text-[11px] text-[#788272] font-medium">{displayBranchName}</p>
-          </div>
+          <p className="text-xs font-bold text-[var(--cr-dark)]">{todayFormatted}</p>
         </div>
       </div>
 

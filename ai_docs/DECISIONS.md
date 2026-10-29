@@ -1,6 +1,6 @@
 # DECISIONS.md — Revera Clinics Decision Log
 
-> **Last Updated:** 2026-10-21 (docs audit: duplicate DEC-025 heading renamed, migration-status lines of DEC-088/110/111/113/114/117 brought up to date; the highest number in use is DEC-122)
+> **Last Updated:** 2026-10-21 (docs audit: duplicate DEC-025 heading renamed, migration-status lines of DEC-088/110/111/113/114/117 brought up to date; the highest number in use is DEC-122). 2026-10-26: DEC-134 added (highest number in use is now DEC-134)
 > **Previous content was for a different project — discarded entirely**
 > **Rule:** Before changing any decision recorded here, read the full entry first.
 
@@ -3537,8 +3537,6 @@ Investigation revealed:
 
 ---
 
----
-
 ## DEC-105: Manual Payments & Wallet Movements Reopened — Superadmin Always, Other Roles By Role-Management Grant
 
 **Date:** 2026-10-17
@@ -3955,7 +3953,7 @@ into this app for the production environment.
 
 ## DEC-128: Permanent Delete Of A Patient Is Refused While Bookings, Payments Or Other History Hang Off It; The Reason Is Named
 
-**Date:** 2026-10-25 · **Status:** Done on dev (branch `fix/patient-hard-delete`); not yet on production · **Related:** RISK-133, DEC-074 (reservation-derived patients), PRODUCT_RULES "Deletion Rules"
+**Date:** 2026-10-25 · **Status:** SUPERSEDED by DEC-130 (the refusal rule is withdrawn; the 404, the checked row delete and the login-after-row order are kept) · **Related:** RISK-133, DEC-074 (reservation-derived patients), PRODUCT_RULES "Deletion Rules"
 
 **Decision:** `DELETE /api/customers?id=X&mode=hard` (superadmin only, unchanged) now:
 1. answers `404` if the patient row does not exist (it used to answer "deleted successfully" for nothing);
@@ -3970,3 +3968,228 @@ A patient that exists only in the list because of bookings (`res-cust-<phone>`, 
 **Not changed on purpose (business decision, see RISK-133):** the rule is the safe one. A permanent delete that also removes the patient's bookings and payments (what the old dialog text implied) would erase income and visit records, so it was not built. Soft Delete (Deactivate) remains the way to hide a patient who has history. No migration: the foreign keys are left as they are.
 
 **Tests:** `tests/routes/customers-hard-delete.test.ts` (15 cases, 11 of which failed before the change). Manual checklist: `ai_docs/manual_tests/PATIENT_HARD_DELETE_MANUAL_TESTS.md`.
+
+## DEC-129: Staff Tokens Are Verified On The Server With The Project's Public Key (Not By Asking The Auth Server Each Time); Middleware Only Rejects Unusable Tokens
+
+**Date:** 2026-10-25 · **Status:** Done on dev (branch `fix/local-jwt-verify`); not yet on production · **Related:** RISK-134, DEC-126, DEC-117, RISK-113
+
+**Decision:**
+1. `requireStaffAccess`, `verifyHrAccess` and `GET /api/auth/me` verify the bearer token through one helper, `verifyAccessToken` (`src/lib/verifyToken.ts`), built on `auth.getClaims()`. ES256 tokens are checked locally against the JWKS; HS256 tokens fall back to one `getUser` call that the helper caches (60 s, 500 entries, hash key) and de-duplicates. The helper adds the issuer / audience / role / anonymous / subject checks `getClaims` omits and maps every failure to 401 (bad token) or 503 (Supabase unreachable or failing).
+2. The employee row (`is_active`, role, permissions) is still read from the database on every request. A valid token is proof of identity only.
+3. `src/middleware.ts` makes no network call: it refuses a missing, malformed or expired token and leaves verification to the handler (every handler under its four prefixes has a guard). `jose` is not used (not a direct dependency).
+4. `requireAuthenticatedUser` (patients) keeps `auth.getUser`.
+5. Provider create/edit take the audit e-mail from the access check, not a second `getUser`.
+
+**Why:** RISK-134. The per-request Auth call was the main driver of about 68,000 Auth requests an hour on the Nano instance; the stall guard's repeats made it worse. Production already signs with an ES256 key, so the check can be local.
+
+**Rejected:** verifying in middleware as well with `jose` (a second implementation, a new direct dependency, no extra security because the handler re-checks); caching the employee row (would delay DEC-117 deactivation); revoking the old HS256 signing key (the legacy `anon` / `service_role` API keys are HS256 JWTs).
+
+**Tests:** `tests/lib/verifyToken.test.ts`, `tests/routes/local-jwt-verification.test.ts`, `tests/routes/middleware-auth.test.ts`. Manual checklist: `ai_docs/manual_tests/LOCAL_JWT_VERIFICATION_MANUAL_TESTS.md`.
+
+## DEC-130: Browser Polls Pause In A Hidden Tab, The Doctor Poll Is 15 s, And Only Admins Ask For The Roles And Employees Lists
+
+**Date:** 2026-10-25 · **Status:** Done on dev (branch `perf/pause-hidden-polling`); not yet on production · **Related:** RISK-136, RISK-134, DEC-113
+
+**Decision:**
+1. Background polls in the admin go through one helper, `startVisiblePoll` (`src/lib/visiblePoll.ts`): no request and no timer while the tab is hidden; one refresh when it is shown again if the data is older than the interval; never two runs at once. Used by the shell's booking poll (15 s) and the HR alerts poll (30 s).
+2. The shell's booking poll (and its first load) does not run while the doctor screens are displayed, because they load their own reservations. Switching back to the admin view reloads.
+3. The doctor view polls every 15 s (was 3 s) while visible. The hidden-tab and in-flight guards stay. `?limit=250` is removed from its request because the route ignores it and honouring it would hide a doctor's older bookings (the route is not changed).
+4. `/api/roles` and `/api/employees` are requested only when the signed-in role is `superadmin` or `admin` (`canLoadAdminDirectory`, mirroring `requireAdministratorAccess`), and a 401/403 is never retried.
+
+**Why:** RISK-136. Each API call costs at least one Supabase Auth check; forgotten and hidden tabs, the 3 s doctor poll and the refused-then-retried admin lists were a large share of the load on the Nano database. The data a person sees while looking at the screen is refreshed exactly as often as before for admins and reception (15 s, 30 s).
+
+**Rejected:** a long-lived shared worker or server push for bookings (more moving parts than the problem needs now); a 60 s poll for everyone (too slow for reception, who rely on it to see website requests); a `limit` on `GET /api/reservations` (see RISK-136); a role check by name guessing on the client (the server's own two normalised values are used).
+
+**Trade-off:** a doctor sees reception's changes up to 15 s later than before. Realtime does not reach the browser for reservations (row-level security), so there is no faster path today; a server-side doctor filter or a policy that lets realtime through would allow a shorter interval at lower cost.
+
+**Tests:** `tests/components/visiblePoll.test.tsx`, `tests/lib/adminDirectory.test.ts`, `tests/lib/pausedPollingWiring.test.ts`, `tests/components/doctor/DoctorAccountView.test.tsx` (cadence updated to 15 s). Manual checklist: `ai_docs/manual_tests/PAUSE_HIDDEN_POLLING_MANUAL_TESTS.md`.
+
+## DEC-131: Public Read Endpoints Get A 60-Second Shared Cache For Anonymous Callers Only; The Booking Popup Loads Its Data On First Open
+
+**Date:** 2026-10-25 · **Status:** Done on dev (branch `perf/cache-public-reads`); not yet on production · **Related:** RISK-137, RISK-067, RISK-134, DEC-129
+
+**Decision:**
+1. The successful GET of `services`, `categories`, `branches`, `packages`, `terms` and `page-settings` sends `Cache-Control: public, s-maxage=60, stale-while-revalidate=300` and `Vary: Authorization` when the request has no `Authorization` header. Any request with an `Authorization` header gets `private, no-store`. One helper (`src/lib/publicCache.ts`) makes that choice so no route can forget the rule.
+2. `page-settings` is shared-cacheable only as the anonymous, stripped variant of a database read. The staff blob, the seeded default and the file fallback are never cached.
+3. `providers` (staff-only fields, read by staff without a token), `availability`, `rooms`, `service-rooms` and `customer-avatars` are not cached.
+4. `BookingModal` loads its data on first open, not on mount. A page-settings read is shared by the language provider, the navbar and the popup, kept for 5 minutes, dropped on a settings-change event.
+
+**Why:** the public site put about 12 calls and 15 queries on a small database per page view and nothing was cached. A 60 s copy removes most of them and is short enough for a clinic CMS.
+
+**Rejected:** `s-maxage` on `providers` (would publish salaries and national ids from the CDN; the route has to be locked down first); caching keyed only by `Vary: Authorization` for staff (staff would still risk stale data after an edit, so they are `no-store`); a longer TTL (editors expect changes within a minute or so); `export const revalidate` in place of headers (the routes read the request and must stay dynamic); removing `force-dynamic`.
+
+**Accepted cost:** a CMS edit can take up to 60 s (plus the stale-while-revalidate window) to show to visitors.
+
+**Tests:** `tests/routes/public-read-caching.test.ts`, `tests/components/BookingModalLazyLoad.test.tsx`, `tests/components/publicPageSettings.test.tsx`. Manual checklist: `ai_docs/manual_tests/PUBLIC_READ_CACHING_MANUAL_TESTS.md`.
+
+*Update 2026-10-26: item 3 above (`providers` not cached) is superseded by DEC-134. The anonymous public projection of `providers` now uses the same shared cache; the full staff response stays `private, no-store`.*
+
+## DEC-132: Permanent Delete Of A Patient Deletes Everything That Belongs To Them (Supersedes DEC-128); The Superadmin Sees The Counts First
+
+**Date:** 2026-10-25 · **Status:** Done on dev (branch `fix/patient-hard-delete-everything`); not yet on production · **Supersedes:** DEC-128 · **Related:** RISK-138, RISK-133, DEC-074 (reservation-derived patients), PRODUCT_RULES "Deletion Rules"
+
+**Decision (owner, superadmin):** when a patient is permanently deleted, everything that belongs to them is deleted with them: bookings, payments (transactions, invoices and their payment rows, product sales), packages, wallet entries, product balances, laser logs, medical records, medical reports and prescriptions. The patient must not come back in the Patients list. DEC-128 (refuse while history exists, answer `409 PATIENT_HAS_HISTORY`) is withdrawn. Soft delete (Deactivate) is unchanged.
+
+**How (`src/lib/customerDeletion.ts`, `DELETE /api/customers?mode=hard`, still superadmin only):**
+1. `404` if the patient row does not exist (unchanged).
+2. A plan is built first (read only): the patient's bookings by `customer_id`, plus un-linked bookings (`customer_id` NULL) that carry the patient's phone (last 9 digits compared) **only if** no other patient row owns that phone and the booking's name is the same or contains / is contained in the patient's name (a booking with the same phone but clearly another name is kept and reported as `keptBookingsOtherName`). The patient's payments are the transactions and invoices with the patient's `customer_id` or with the `reservation_id` of a booking being deleted (and `customer_id` NULL or the patient), plus the patient's product sales.
+3. Deletion order, one request per table, patient row last: `transactions` -> `payments` (rows of those invoices) -> `invoices` (invoice lines cascade) -> `product_sales` -> `wallet_txns` -> `customer_packages` (package items, pulse usage and revenue recognitions cascade) -> `customer_product_balances` -> `laser_pulse_logs` -> `medical_records` -> `medical_reports` -> `prescriptions` -> `reservations` -> `customers`. Every table is deleted explicitly instead of relying on `ON DELETE` rules, because the dev and production databases were built by different paths (RISK-020) and so the counts are exact.
+4. A failing step stops the run and is reported: `500 { code: "PATIENT_DELETE_FAILED", failedStep, removedSoFar, error }`. Nothing after it runs, and the Auth login is not touched. Because the patient row goes last, the patient is still in the list and the delete can simply be run again; it is idempotent.
+5. Only after the row is gone, the linked Auth user is removed (by `auth_user_id`, else e-mail/phone match). A login that belongs to an `employee_accounts` row is never removed (unchanged guard).
+6. The response is `{ message, removed: { bookings, payments, paymentsAmount, packages, walletEntries, productBalances, laserSessions, clinicalRecords }, keptBookingsOtherName }` and the server logs one line `patient hard delete: id=... by=... bookings=... payments=...`.
+
+**Booking-derived entry (`res-cust-<phone>`, no patient row):** hard delete deletes the un-linked bookings that carry that phone, plus their transactions and invoices, so the entry disappears (`404` if none is left; `409 PATIENT_RECORD_EXISTS` if a patient row now owns that phone, i.e. the list on screen is stale; `400` if the id has no usable phone). Soft delete stays `409 PATIENT_IS_BOOKING_DERIVED` (there is no row to deactivate) with a clearer message that points to Hard Delete or the Bookings screen.
+
+**Preview (`GET /api/customers?id=<id>&deletePreview=1`, superadmin only, read only):** `{ patientId, derived, name, counts: { bookings, payments, paymentsAmount, packages, walletEntries, productBalances, laserSessions, clinicalRecords }, keptBookingsOtherName }`. `payments` = transactions + invoices + product sales; `paymentsAmount` = completed money-in transactions (payment, outstanding_payment, product_purchase, wallet_topup) from the ledger, so it is an indication and not a reconciled total. The admin Delete Customer dialog (`src/app/admin/page.tsx`, English and Arabic) loads it when it opens; "Hard Delete" first shows "This will permanently delete: 3 bookings, 2 payment records (2,700 EGP), ..." with a red "Yes, permanently delete everything" button, and is unavailable if the preview could not be loaded. `src/lib/customerDeletionText.ts` holds the sentence builder.
+
+**Why:** RISK-138. The owner wants test and mistaken patients gone completely, not hidden. DEC-128's rule left them undeletable once they had a booking.
+
+**No migration, no schema change.** The foreign keys are left as they are. The deletion is a sequence of requests, not one database transaction (an RPC was considered for atomicity and not built: it could not be tested against a real database in this work, and the ordered, retryable sequence has the same end state).
+
+**Limits / consequences (accepted):** income recorded for this patient disappears from finance reports; inventory is not put back for the product sales and consumables of the deleted bookings; there is no undo. Un-linked product sales that only carry the patient's phone are not found. Other staff screens that already hold the patient in memory refresh on their next poll.
+
+**Tests:** `tests/routes/customers-hard-delete.test.ts` (everything is deleted, another patient and another booking's payment untouched, staff login guard, 404, failing step reported, derived entry disappears, preview counts), `tests/lib/customerDeletionText.test.ts`. Manual checklist: `ai_docs/manual_tests/PATIENT_HARD_DELETE_EVERYTHING_MANUAL_TESTS.md`.
+
+---
+
+## DEC-133: Permanently Deleting A Booking Also Deletes Its Payments And Invoice And Takes Its Share Out Of The Patient's Figures
+
+**Date:** 2026-10-25 · **Status:** Done on dev (branch `fix/booking-hard-delete-cascade`); not yet on production; **no migration** · **Related:** RISK-139, DEC-121, DEC-127, DEC-128
+
+**Decision:** `DELETE /api/reservations?id=<id>&mode=hard` (superadmin only, unchanged) now calls `hardDeleteBooking` (`src/lib/bookingHardDelete.ts`). In order, with an undo for each step that can be undone:
+1. reads the booking, its patient, its ledger invoice(s) and their payments, its `transactions` rows and the package sessions it consumed. A failed read changes nothing;
+2. **patient figures** (`customers.spent_amount`, `outstanding`, `number_of_bookings`): written back with the booking's share removed, guarded so it only writes if the three values are still what was read (otherwise `409 PATIENT_FIGURES_CHANGED`, nothing changed);
+3. **package sessions**: for each `package_revenue_recognitions` row of this booking with reason `session` and a package item (the receipt of `consume_customer_package_session`), `qty_used` -1 and `qty_remaining` +1 on that item (guarded); a `fully_used` package that is not expired goes back to `active`;
+4. **payments**: deletes the booking's `transactions` rows (`reservation_id` = the booking, or `invoice_id` = the booking's own invoice), except `wallet_topup` / `wallet_deduction` rows;
+5. **the booking** (the commit point). Its `reservation_products`, `consumption_entries` and `package_revenue_recognitions` go with it by foreign key, as before;
+6. **the booking's ledger invoice(s)** (`invoices.reservation_id` = the booking); their `payments` and `invoice_lines` cascade.
+
+A failure in steps 2 to 5 undoes the earlier steps (figures restored, sessions taken back, payments re-inserted with their original ids) and answers `500` "the booking was not deleted and nothing was changed". If an undo itself fails the answer says so (`partial: true`, `undoFailures`) and it is logged with `console.error`. A failure in step 6 happens after the booking is gone, so the delete still answers `200` with a `warnings` entry naming the invoice that is left. The response carries `removed` (transaction ids/types/amounts, their total, invoice numbers, payment count, wallet transactions kept, package sessions given back) and `customer` (figures before/after); one `console.info` line `[audit] booking hard delete ...` records the same. `id=all` and soft delete are unchanged (`id=all` does not cascade).
+
+**The patient-figure rules** (`src/lib/bookingDeletion.ts`; derived from the code that writes them, not from recomputing): the booking's share is read from its own row. `spent` loses `amount_paid` if the booking is `completed` or `no_show` (the two statuses at which the total was increased), `outstanding` loses `amount_left` if it is `completed`, `number_of_bookings` loses 1 for any status. A confirmed/approved/started booking with a deposit never reached the stored totals, so it gives back no money. Every figure is floored at 0 (a warning says so). Nothing is recomputed from the other bookings, because the same totals also hold product sales, package sales, manual adjustments and wallet effects that no booking knows about. Settle Debt and later payments change the booking's `amount_paid`/`amount_left` together with the totals, and editing a previous booking re-settles the totals by the change, so the booking row is the right source.
+
+**UI:** the Hard Delete choice of the booking dialog now says (English and Arabic) that the booking's payments and invoice are deleted too, shows the amount paid on the booking when the screen has it, and that the patient's Total Spend, Outstanding and bookings count go down by the booking's share (`bookingHardDeleteWarning`, `hardDeleteNote` option of `showDeleteConfirm`). After a hard delete the patients list is refreshed.
+
+**Not done on purpose:**
+- **Wallet** is not reversed. A previous booking that was underpaid may have used wallet credit first, an overpayment may have settled other debt or credited the wallet; the amounts are not stored on the booking. Wallet-type `transactions` rows are kept for the same reason (they describe the wallet, which did not move back).
+- **Pulse (laser) package usage** (`package_pulse_usage`, `customer_packages.pulses_used`) and package usage of **previous (historical) bookings** are not given back: they are not tied to a `package_revenue_recognitions` receipt, so a reversal would be a guess. Follow-up, RISK-139.
+- `product_sales` rows (no link to the booking in the schema), `medical_records`, `prescriptions`, `laser_pulse_logs` stay and just lose the link, as before. `wallet_txns` stay.
+- Not atomic: Supabase's API has no multi-statement transaction, so the sequence above is the substitute. A Postgres function would make it atomic, but it could not be run or tested here without writing to a database.
+- A manual transaction that was created through the API with a `reservation_id` also moved the totals itself; the screens never send that field, so it is not reversed separately.
+
+**Tests:** `tests/routes/reservations-hard-delete-cascade.test.ts` (23 cases, 18 of which failed before the change), `tests/lib/bookingDeletion.test.ts`. Manual checklist: `ai_docs/manual_tests/BOOKING_HARD_DELETE_CASCADE_MANUAL_TESTS.md`.
+---
+
+## DEC-134: The Doctors Endpoint Has Two Answers: A Small Public Projection For Everyone, The Full Record Only For A Valid Staff Token
+
+**Date:** 2026-10-26 · **Status:** Done on dev (branch `fix/providers-public-projection`); not yet on production · **Related:** RISK-140, RISK-137, DEC-131, DEC-129
+
+**Decision:**
+1. `GET /api/providers` returns the full response (unchanged shape, including `bookings`) only when the request carries a valid staff bearer token (`requireStaffAccess`). Every other caller gets the public projection: no header, a junk or expired token, a valid token of a non-staff user, or an inactive staff account. These are never answered with 401, so the public site cannot break.
+2. The public projection is an **allow-list** in `src/lib/publicProvider.ts`: `id, name, specialty, image, services, rating, active, branchId, workingDaysHours`, with the schedule rebuilt key by key. Not "the full row minus secrets": a new column must not become public by default.
+3. When the token check itself fails (500/503) the route returns that error. A reduced list is never substituted for a staff request, because the Doctors screen would show salaries as 0 and an edit could save that.
+4. The public path reads only `providers`. The reservation counts, the `employee_accounts` read and the employee-to-provider auto-sync (a write) are staff-only. The anonymous projection uses the 60-second shared cache of DEC-131; anything with an `Authorization` header is `private, no-store`.
+5. The one staff caller, `useProviderForm.fetchProviders`, sends the token read at call time (`getAuthHeaders()`).
+
+**Why:** the endpoint exposed salaries, national ids, phones, emails and commission settings of every doctor to anyone. The public booking popup needs a handful of fields. Splitting by token keeps every staff screen exactly as it was and costs the public path one table read.
+
+**Rejected:**
+- Requiring a token on the whole route (`401` for anonymous): breaks the public booking popup.
+- A deny-list (copy the row, delete phone, salary, ...): the next column added would leak by default.
+- A second route (`/api/providers/public`) for the site: two URLs to keep in step and the leaking URL would still need locking.
+- Gating the full response by a permission such as `providers.view`: not requested, would change what reception sees today. Recorded as a follow-up in RISK-140.
+- Falling back to the public projection when the token check returns 500/503: see decision 3.
+
+**Accepted cost:** a doctor employee that has no `providers` row (for example after a role is switched to a doctor workspace) now gets one when a staff member next opens the admin, not on the next public page view. `POST`/`PATCH /api/employees` create the row immediately, so this affects only that rare path.
+
+**Tests:** `tests/routes/providers-public-projection.test.ts`, `tests/components/doctor/useProviderFormToken.test.tsx`, `tests/routes/public-read-caching.test.ts`. Manual checklist: `ai_docs/manual_tests/PROVIDERS_PUBLIC_PROJECTION_MANUAL_TESTS.md`.
+
+---
+
+## DEC-135: Unique Payment Sequence References & Manual Booking Invoice Normalization
+
+**Date:** 2026-10-26
+**Status:** Decided & implemented
+
+**Context:**
+1. **Invoice Number Duplication Across Payments:** When bookings were completed, an invoice `INV-000001` was generated. Subsequent payments against the same reservation (e.g., checkout balances after deposit, later balance settlements in `appendPaymentToExistingInvoice`, or debt settlements in `/api/customers/settle-debt`) were recorded with `referenceNo: null`. When displayed in transaction history or patient transaction tables, the UI fell back to `{tx.reference_no || tx.invoice_no}`, causing both Payment 1 and Payment 2 to display the same invoice number (`INV-000001`). In accounting and financial audits, every payment receipt must carry its own unique, sequential reference number.
+2. **Manual Booking Legacy Invoice Formation:** Manual bookings (`POST /api/reservations` with `isManual: true`) previously did not create an `invoices` row. When staff opened "View Invoice" or printed invoices, the modal and PDF printer fell back to legacy temporary formations (`REV-INV-${id.slice(0, 8)}` or `INV-${id.slice(0, 8)}`), violating the sequential numbering requirement (`INV-XXXXXX`).
+
+**Decision:**
+1. **Unique Sequential Receipt References (`next_invoice_no`):**
+   - In `recordTransaction` (`src/lib/transactionLedger.ts`): If `referenceNo` is omitted, the engine automatically generates an atomic sequential reference using `next_invoice_no` formatted as `INV-XXXXXX`.
+   - In `writeCheckoutInvoice` (`src/app/api/reservations/route.ts`): Reuses any pre-existing invoice for the reservation rather than generating duplicate invoice rows. If `priorPaid > 0` and `newMoneyAtCheckout > 0`, generates a fresh unique sequence reference (`next_invoice_no`) for the checkout payment so Payment 1 and Payment 2 have distinct reference numbers.
+   - In `appendPaymentToExistingInvoice` (`src/app/api/reservations/route.ts`): Generates an atomic sequential reference when `paymentReference` is null, writing it to `payments.reference` and `recordTransaction.referenceNo`.
+   - In `/api/customers/settle-debt` (`src/app/api/customers/settle-debt/route.ts`): Automatically generates unique sequential references for all debt settlement payments against issued invoices.
+2. **Manual Booking Invoice Creation & Normalization:**
+   - In `POST /api/reservations`: When `isManual` is true, an authoritative invoice row (`invoices`) and itemized lines (`invoice_lines`) are immediately created with an atomic sequential `INV-XXXXXX` number. If an initial payment is collected, a payment row (`payments`) and ledger transaction (`recordTransaction`) are created referencing this invoice number.
+   - In `GET /api/reservations`: Batch-fetches invoice numbers and enriches each reservation with `invoiceNo`.
+   - In `GET /api/invoices`: If no invoice is found for an existing reservation, auto-creates the standard `INV-XXXXXX` invoice, line items, and payment row.
+   - Eliminated legacy `REV-INV-${id.slice(0, 8)}` fallbacks in `src/app/admin/page.tsx` (lines 10668 & 11142) and `src/lib/printUtils.ts`. PDF print and modal preview now strictly use sequential `INV-XXXXXX` numbers.
+3. **Automated Verification:**
+   - Added test case `TC-103: Unique Payment Sequence Numbering & Manual Booking Invoice Generation` in Admin Settings System Test Suite (`/admin -> Settings -> System Test Suite`).
+   - Verified clean compilation with `tsc --noEmit` (0 errors) and `npm run build`.
+
+---
+
+## DEC-136: Payment Status Threshold & Per-Session Debt Settlement Engine
+
+**Date:** 2026-10-28
+**Status:** Decided & implemented
+
+**Context:**
+1. **Payment Status Derivation Inconsistency**: When a session started and ended with zero payments made (`amountPaid = 0`), completed sessions in `AdminBookingsView.tsx` previously evaluated to `"Partially Paid"` due to a conditional clause `st !== "completed"` causing the evaluation to fall through to `else if (amtLeft > 0)`. In `ReceptionDashboardView.tsx`, a ternary bug treated any `amountLeft > 0` as `"Partial"` even when `amountPaid = 0`. Staff expected strict behavior: if a session ends with 0 EGP paid, its payment situation must strictly be `"Unpaid"`, and `"Partially Paid"` must only begin when at least 1 EGP has been collected until fully paid.
+2. **Settle Balance Accessibility**: In the patient profile, staff should only see or open the "Settle Balance" action if the patient actually carries an outstanding debt (`customer.outstanding > 0`).
+3. **Itemized Per-Session Balance Settlement**: If a patient has outstanding balances across one or more past sessions, staff needed visibility into an itemized session list (date, time, service names, doctor, total price, paid amount, and remaining debt) to select which specific session to settle, rather than only having an opaque bulk FIFO settlement.
+
+**Decision:**
+1. **Strict Payment Status Calculation**:
+   - `AdminBookingsView.tsx`: Removed `st !== "completed"` from the `amtPaid <= 0` branch. Formulated strictly: `amtPaid < 1 && amtLeft > 0` is `"Unpaid"`; `amtPaid >= 1 && amtLeft > 0` is `"Partially Paid"`; `amtLeft <= 0` or zero-cost completed/historical bookings is `"Paid"`.
+   - `BookingDetailsModal.tsx`: Updated badge to `{isInvoicePaid ? "Paid" : sessionPaid >= 1 ? "Partially Paid" : "Unpaid"}`.
+   - `ReceptionDashboardView.tsx`: Updated payment status derivation so `r.amountPaid < 1 && r.amountLeft > 0` evaluates strictly to `"Unpaid"`, and `"Partial"` begins only at `r.amountPaid >= 1`.
+   - `CustomerProfileDrawer.tsx`: Updated Booking History table payment status: `const paymentStatus = left <= 0 ? "paid" : (spent >= 1 ? "partial" : "unpaid");`.
+2. **Settle Balance Gating**:
+   - In `CustomerProfileDrawer.tsx`, the "Settle Balance" button in the Outstanding financial card is rendered conditionally only when `Number(viewingCustomerProfile.outstanding || 0) > 0` and the user possesses `customers.action_settle_balance` permission.
+   - In `SettleDebtModal.tsx`, a zero-debt guard alert informs staff if outstanding balance is 0.
+3. **Itemized Per-Session Breakdown & Targeted Settlement**:
+   - `GET /api/customers/settle-debt`: Added GET handler. When called without `customerId`, returns operational test status (`{ success: true, status: 'operational' }`). When called with `?customerId=...`, queries all unpaid reservations (`amount_left > 0`), resolves service names, doctor names, and invoice numbers, returning `{ customer, unpaidSessions }`.
+   - `SettleDebtModal.tsx`: Redesigned with an interactive session picker displaying all unpaid sessions. Selecting an individual session auto-fills the settlement amount with that session's remaining debt. Selecting "All Sessions" auto-fills the total outstanding balance.
+   - `POST /api/customers/settle-debt`: Added support for optional `reservationId`. When provided and not `'all'`, validates that `amount <= amount_left`, updates that specific reservation's `amount_paid` and `amount_left`, appends the payment to its issued invoice with a unique atomic sequential reference (`INV-XXXXXX`), records an `outstanding_payment` transaction in the financial ledger, and decrements `customers.outstanding` and increments `customers.spent_amount`. If omitted or `'all'`, applies FIFO settlement across unpaid reservations.
+4. **Automated Verification**:
+   - Added test case `TC-104: Payment Status Calculation & Multi-Session Debt Settlement Engine` to the Admin Settings System Test Suite (`INITIAL_SYSTEM_TEST_SUITES`).
+   - Added route tests in `tests/routes/settle-debt.test.ts` covering GET unpaid session breakdown, operational ping, targeted reservation settlement, and over-allocation rejection.
+   - Registered `GET /api/customers/settle-debt` in `tests/routes/auth-sweep.test.ts` (all 318 tests passing).
+   - Verified clean production build with `npm run build` (0 compiler/TypeScript errors).
+
+---
+
+## DEC-137: Doctor Prescription Persistence, Non-UUID Safety & Real-Time Booking Details Synchronization
+
+**Date:** 2026-10-28
+**Status:** Decided & implemented
+
+**Context:**
+1. **Prescriptions Missing in Booking Details**: When a doctor wrote and saved a digital prescription during an ongoing clinical session (in `DoctorOngoingSessionTab.tsx`), the prescription failed to appear in the Booking Details modal (`BookingDetailsModal.tsx`) when viewing that booking.
+2. **Root Cause Analysis**:
+   - In `POST /api/prescriptions`, `basePrescriptionData.booking_id` was previously guarded behind a redundant check `await supabaseServer.from('reservations').select('id').eq('id', cleanBookingId).maybeSingle()`. When non-UUID booking IDs (e.g. `'1780826201251-408'` in local data or custom test IDs) or uncommitted IDs were used, Supabase Postgres threw a `22P02` syntax error. The catch block swallowed it, causing `booking_id` to be silently stripped. In local fallback (`data/prescriptions.json`), every single prescription was written with `booking_id: null`.
+   - In `GET /api/prescriptions`, an `else if` between `bookingId` and `customerId` meant that querying by `bookingId` completely ignored `customerId`. If `booking_id` in the database was null, the query returned `[]`.
+   - `BookingDetailsModal.tsx` lacked an event listener for `revera-prescription-change` (which `DoctorOngoingSessionTab` dispatches), leaving open modals stale.
+   - When switching to End Session mode (`viewMode === "end_session"`), `rxDiagnosis`, `rxMedications`, and clinical notes were never prefilled from existing prescriptions, showing empty form fields and risking accidental overwrite.
+   - If a doctor filled in prescription fields but completed treatment without explicitly clicking "Save Prescription", entered prescription details were not auto-saved.
+
+**Decision:**
+1. **Prescription Booking Linkage & Non-UUID Safety**:
+   - `POST /api/prescriptions`: `cleanBookingId` is always preserved in `basePrescriptionData.booking_id`. For Supabase Postgres (where column `booking_id` is a UUID FK), if `cleanBookingId` is not a UUID, `booking_id` is omitted from the Supabase insert payload to prevent `22P02`, while being retained in the returned result and local JSON. Postgres FK error `23503` and `22P02` are caught with automatic retry without `booking_id`.
+   - `GET /api/prescriptions`: Accepts `customerId` and `date` alongside `bookingId`. If `bookingId` returns 0 results but `customerId` is provided, automatically falls back to finding the customer's prescription for that session date.
+2. **Real-Time Zero-Reload Synchronization**:
+   - `BookingDetailsModal.tsx`: Extracted `loadPrescriptions` querying `bookingId`, `customerId`, and `date`. Added listeners for `revera-prescription-change` and `revera-booking-change` with cleanup on unmount.
+   - Pre-fills `rxDiagnosis`, `rxMedications`, `rxGeneralNotes`, and follow-up data into state when prescriptions load, and tracks `existingRxId`.
+   - In `handleSaveInlinePrescription` and `handleConfirmEndSession`, passes `id: existingRxId` to perform immutable version updates instead of creating orphaned duplicate rows.
+   - In Card B (PRESCRIPTION), added an "Edit" button next to the Recorded date badge to open `showDrawerPrescriptionModal` pre-populated with existing prescription details.
+3. **Doctor Portal Auto-Save**:
+   - `DoctorOngoingSessionTab.tsx`: When "Complete Treatment" is clicked, if the doctor entered prescription details (`rxDiagnosis` or `rxMedications`) without explicitly clicking "Save Prescription", auto-saves inline before completing the session.
+4. **Automated Verification**:
+   - Added test case `TC-105: Doctor Prescription & Booking Details Real-Time Sync Engine` to the Admin Settings System Test Suite (`INITIAL_SYSTEM_TEST_SUITES`).
+   - Added unit test suite `tests/routes/prescriptions-booking-sync.test.ts` (5 passed).
+   - Verified `DoctorOngoingSessionTab.test.tsx` (13 passed).
+

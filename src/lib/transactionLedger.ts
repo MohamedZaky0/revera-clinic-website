@@ -1,4 +1,5 @@
 import { supabaseServer } from '@/lib/supabaseServer';
+import { formatInvoiceNo } from '@/lib/ledger';
 
 /**
  * Records a row in `transactions` — the customer-facing financial history shown in
@@ -81,6 +82,8 @@ export async function recordTransaction({
       console.warn('recordTransaction: next_transaction_seq failed, using fallback transaction ID:', seqErr);
     }
 
+    const finalReferenceNo = referenceNo?.trim() || null;
+
     const { error: insertErr } = await supabaseServer.from('transactions').insert({
       transaction_id: txnId,
       branch_id: branchId ?? null,
@@ -89,11 +92,11 @@ export async function recordTransaction({
       reservation_id: reservationId ?? null,
       type,
       description,
-      payment_method: paymentMethod,
+      payment_method: paymentMethod || 'cash',
       amount: Number(amount),
-      status,
-      source,
-      reference_no: referenceNo ?? null,
+      status: status || 'completed',
+      source: source || 'automatic',
+      reference_no: finalReferenceNo,
       reason: reason ?? null,
       created_by_employee_id: createdByEmployeeId ?? null,
       created_by_name: createdByName ?? null,

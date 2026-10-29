@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   User,
   Phone,
@@ -234,6 +234,7 @@ function BookingDetailsModal({
 
   const [copiedBookingRef, setCopiedBookingRef] = useState<boolean>(false);
   const [drawerPrescriptions, setDrawerPrescriptions] = useState<any[]>([]);
+  const [existingRxId, setExistingRxId] = useState<string | null>(null);
   const [showDrawerPrescriptionModal, setShowDrawerPrescriptionModal] = useState(false);
   const [showDrawerProductModal, setShowDrawerProductModal] = useState(false);
   const [selectedDrawerProductId, setSelectedDrawerProductId] = useState("");
@@ -532,22 +533,71 @@ function BookingDetailsModal({
       .finally(() => setLoadingDeviceLinks(false));
   }, [primaryServiceId]);
 
-  useEffect(() => {
-    if (booking) {
-      const bookId = booking.id || "";
-      const params = new URLSearchParams();
-      if (bookId) {
-        params.set("bookingId", String(bookId));
-      }
-
-      fetch(`/api/prescriptions?${params.toString()}`, { headers: authenticatedJsonHeaders })
-        .then((res) => (res.ok ? res.json() : []))
-        .then((data) => setDrawerPrescriptions(Array.isArray(data) ? data : []))
-        .catch((err) => console.warn("Error fetching drawer prescriptions:", err));
-    } else {
+  const loadPrescriptions = useCallback(async () => {
+    if (!booking) {
       setDrawerPrescriptions([]);
+      setExistingRxId(null);
+      return;
     }
-  }, [booking?.id]);
+    const bookId = booking.id || "";
+    const custId = booking.customerId || (booking as any).customer_id || "";
+    const bookingDate = booking.date || "";
+    const params = new URLSearchParams();
+    if (bookId) params.set("bookingId", String(bookId));
+    if (custId) params.set("customerId", String(custId));
+    if (bookingDate) params.set("date", String(bookingDate));
+
+    try {
+      const res = await fetch(`/api/prescriptions?${params.toString()}`, { headers: authenticatedJsonHeaders });
+      if (res.ok) {
+        const data = await res.json();
+        const rxList = Array.isArray(data) ? data : (data?.prescriptions || []);
+        setDrawerPrescriptions(rxList);
+
+        // Pre-fill the inline prescription form (for end_session mode) if existing prescription found
+        const matchingRx = rxList.find((rx: any) => String(rx.booking_id) === String(bookId)) || rxList[0];
+        if (matchingRx) {
+          setExistingRxId(matchingRx.id || null);
+          if (matchingRx.diagnosis) {
+            setRxDiagnosis(matchingRx.diagnosis);
+          }
+          if (Array.isArray(matchingRx.medications) && matchingRx.medications.length > 0) {
+            setRxMedications(matchingRx.medications);
+          }
+          const notes = matchingRx.instructions || matchingRx.general_notes || "";
+          if (notes) {
+            setRxGeneralNotes(notes);
+          }
+          if (matchingRx.follow_up_date) {
+            setRxFollowUpDate(String(matchingRx.follow_up_date).slice(0, 10));
+            setRxHasFollowUp(true);
+          }
+          if (matchingRx.follow_up_notes) {
+            setRxFollowUpNotes(matchingRx.follow_up_notes);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("Error fetching drawer prescriptions:", err);
+    }
+  }, [booking?.id, booking?.customerId, (booking as any)?.customer_id, booking?.date, authenticatedJsonHeaders]);
+
+  useEffect(() => {
+    loadPrescriptions();
+
+    const handlePrescriptionSync = () => {
+      loadPrescriptions();
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("revera-prescription-change", handlePrescriptionSync);
+      window.addEventListener("revera-booking-change", handlePrescriptionSync);
+      return () => {
+        window.removeEventListener("revera-prescription-change", handlePrescriptionSync);
+        window.removeEventListener("revera-booking-change", handlePrescriptionSync);
+      };
+    }
+  }, [loadPrescriptions]);
 
   async function handleDeleteBooking() {
     const patientLabel = booking?.name || (booking as any)?.customer_name || booking?.phone || "this booking";
@@ -646,24 +696,30 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       const followUpDateVal = drawerRxHasFollowUp && drawerRxFollowUpDate ? drawerRxFollowUpDate : null;
       const followUpNotesVal = drawerRxHasFollowUp && drawerRxFollowUpNotes ? drawerRxFollowUpNotes : null;
 
+      const payload: Record<string, any> = {
+        booking_id: booking.id,
+        customer_id: custId ? String(custId) : null,
+        patient_name: booking.name || "Patient",
+        customer_name: booking.name || "Patient",
+        doctor_name: booking.doctorName || null,
+        date: booking.date || new Date().toISOString().slice(0, 10),
+        diagnosis: drawerRxDiagnosis,
+        medications: drawerRxMeds.filter((m) => m.name.trim() !== ""),
+        instructions: drawerRxNotes,
+        general_notes: drawerRxNotes,
+        doctor_notes: booking.notes || "",
+        follow_up_date: followUpDateVal,
+        follow_up_notes: followUpNotesVal,
+      };
+
+      if (existingRxId || drawerPrescriptions[0]?.id) {
+        payload.id = existingRxId || drawerPrescriptions[0]?.id;
+      }
+
       const res = await fetch("/api/prescriptions", {
         method: "POST",
         headers: authenticatedJsonHeaders,
-        body: JSON.stringify({
-          booking_id: booking.id,
-          customer_id: custId ? String(custId) : null,
-          patient_name: booking.name || "Patient",
-          customer_name: booking.name || "Patient",
-          doctor_name: booking.doctorName || null,
-          date: booking.date || new Date().toISOString().slice(0, 10),
-          diagnosis: drawerRxDiagnosis,
-          medications: drawerRxMeds.filter((m) => m.name.trim() !== ""),
-          instructions: drawerRxNotes,
-          general_notes: drawerRxNotes,
-          doctor_notes: booking.notes || "",
-          follow_up_date: followUpDateVal,
-          follow_up_notes: followUpNotesVal,
-        })
+        body: JSON.stringify(payload)
       });
 
       if (res.ok) {
@@ -687,18 +743,11 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         setDrawerRxFollowUpDate("");
         setDrawerRxFollowUpNotes("");
 
-        const params = new URLSearchParams();
-        if (booking.id) params.set("bookingId", String(booking.id));
-
-        const rxRes = await fetch(`/api/prescriptions?${params.toString()}`, { headers: authenticatedJsonHeaders });
-        if (rxRes.ok) {
-          const rxData = await rxRes.json();
-          setDrawerPrescriptions(Array.isArray(rxData) ? rxData : []);
-        }
         if (typeof window !== "undefined") {
           window.dispatchEvent(new CustomEvent("revera-prescription-change"));
           window.dispatchEvent(new CustomEvent("revera-booking-change"));
         }
+        loadPrescriptions();
         fetchAllReservations();
       } else {
         const err = await res.json().catch(() => ({}));
@@ -980,7 +1029,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       const followUpDateVal = rxHasFollowUp && rxFollowUpDate ? rxFollowUpDate : null;
       const followUpNotesVal = rxHasFollowUp && rxFollowUpNotes ? rxFollowUpNotes : null;
 
-      const payload = {
+      const payload: Record<string, any> = {
         booking_id: booking.id,
         customer_id: custId ? String(custId) : null,
         patient_name: patientName,
@@ -994,6 +1043,10 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         follow_up_notes: followUpNotesVal,
         date: booking.date || new Date().toISOString().slice(0, 10),
       };
+
+      if (existingRxId || drawerPrescriptions[0]?.id) {
+        payload.id = existingRxId || drawerPrescriptions[0]?.id;
+      }
 
       const res = await fetch("/api/prescriptions", {
         method: "POST",
@@ -1013,12 +1066,14 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         }
 
         const newRx = await res.json().catch(() => payload);
+        if (newRx?.id) setExistingRxId(newRx.id);
         alert(isRTL ? "تم حفظ الروشتة الإلكترونية بنجاح!" : "Prescription saved successfully!");
         printPrescription(newRx, booking);
         if (typeof window !== "undefined") {
           window.dispatchEvent(new CustomEvent("revera-prescription-change"));
           window.dispatchEvent(new CustomEvent("revera-booking-change"));
         }
+        loadPrescriptions();
         fetchAllReservations();
       } else {
         const err = await res.json().catch(() => ({}));
@@ -1236,7 +1291,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         try {
           const followUpDateVal = rxHasFollowUp && rxFollowUpDate ? rxFollowUpDate : null;
           const followUpNotesVal = rxHasFollowUp && rxFollowUpNotes ? rxFollowUpNotes : null;
-          const rxPayload = {
+          const rxPayload: Record<string, any> = {
+            id: existingRxId || (drawerPrescriptions[0]?.id) || undefined,
             booking_id: booking.id,
             customer_id: custId ? String(custId) : null,
             patient_name: patientName,
@@ -1250,6 +1306,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             follow_up_notes: followUpNotesVal,
             date: booking.date || new Date().toISOString().slice(0, 10),
           };
+          if (!rxPayload.id) delete rxPayload.id;
           await fetch("/api/prescriptions", {
             method: "POST",
             headers: authenticatedJsonHeaders,
@@ -3849,9 +3906,33 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                           <span>PRESCRIPTION</span>
                         </div>
                         {drawerPrescriptions.length > 0 ? (
-                          <span className="text-[10px] font-bold text-[var(--color-brand-secondary)] bg-gray-100 px-2 py-0.5 rounded-full">
-                            {drawerPrescriptions[0].date ? new Date(drawerPrescriptions[0].date).toLocaleDateString("en-GB", { day: "2-digit", month: "short" }) : "Recorded"}
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] font-bold text-[var(--color-brand-secondary)] bg-gray-100 px-2 py-0.5 rounded-full">
+                              {drawerPrescriptions[0].date ? new Date(drawerPrescriptions[0].date).toLocaleDateString("en-GB", { day: "2-digit", month: "short" }) : "Recorded"}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const rx = drawerPrescriptions[0];
+                                setDrawerRxDiagnosis(rx.diagnosis || "");
+                                setDrawerRxMeds(Array.isArray(rx.medications) && rx.medications.length > 0 ? rx.medications : [{ name: "", dosage: "", frequency: "", duration: "" }]);
+                                setDrawerRxNotes(rx.instructions || rx.general_notes || "");
+                                if (rx.follow_up_date) {
+                                  setDrawerRxFollowUpDate(String(rx.follow_up_date).slice(0, 10));
+                                  setDrawerRxHasFollowUp(true);
+                                }
+                                if (rx.follow_up_notes) {
+                                  setDrawerRxFollowUpNotes(rx.follow_up_notes);
+                                }
+                                setShowDrawerPrescriptionModal(true);
+                              }}
+                              className="rounded-xl border border-gray-200 bg-white px-2 py-0.5 text-[11px] font-bold text-[var(--cr-dark)] hover:bg-gray-50 transition flex items-center gap-1 cursor-pointer shadow-2xs"
+                              title="Edit Prescription"
+                            >
+                              <Edit size={11} />
+                              <span>Edit</span>
+                            </button>
+                          </div>
                         ) : (
                           <button
                             type="button"
@@ -4298,11 +4379,11 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                         <span className={`rounded-full px-3 py-0.5 text-xs font-extrabold ${
                           isInvoicePaid 
                             ? 'bg-[#EBF7EE] text-[#1E7E34]' 
-                            : (pulseDeficit > 0 && !hasSettledDeficit) || sessionPaid > 0
+                            : sessionPaid >= 1
                             ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                            : 'bg-amber-50 text-amber-800'
+                            : 'bg-rose-50 text-rose-800 border border-rose-200'
                         }`}>
-                          {isInvoicePaid ? "Paid" : (pulseDeficit > 0 && !hasSettledDeficit) || sessionPaid > 0 ? "Partially Paid" : "Unpaid"}
+                          {isInvoicePaid ? "Paid" : sessionPaid >= 1 ? "Partially Paid" : "Unpaid"}
                         </span>
                       </div>
                     </div>
@@ -4333,7 +4414,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                               ...additionalServicesList.map(s => ({ id: s.name, name: s.name, price: s.total })),
                               ...productsConsumablesList.map(p => ({ id: p.name, name: `${p.name} (x${p.qty})`, price: p.total }))
                             ];
-                            printInvoice(booking as any, allInvoiceItems, totalPrice, 0, bName);
+                            printInvoice(booking as any, allInvoiceItems, totalPrice, 0, bName, (booking as any).invoiceNo || (booking as any).invoice_no);
                           }
                         }}
                         className="rounded-2xl border border-gray-200 bg-white py-2.5 px-2 text-xs font-bold text-[var(--cr-dark)] hover:bg-gray-50 transition flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer"

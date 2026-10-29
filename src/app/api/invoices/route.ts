@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { requireStaffAccess } from '@/lib/access';
 import { supabaseServer } from '@/lib/supabaseServer';
+import { formatInvoiceNo, buildInvoiceLine, buildInvoiceTotals } from '@/lib/ledger';
+import { getServicePriceDetails } from '@/lib/services';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,7 +30,7 @@ export async function GET(req: Request) {
 
   try {
     // Fetch the non-void invoice for this reservation
-    const { data: invoice, error: invErr } = await supabaseServer
+    let { data: invoice, error: invErr } = await supabaseServer
       .from('invoices')
       .select('id, invoice_no, reservation_id, customer_id, branch_id, issued_at, subtotal, discount_total, grand_total, status')
       .eq('reservation_id', reservationId)
@@ -39,7 +41,103 @@ export async function GET(req: Request) {
 
     if (invErr) throw invErr;
     if (!invoice) {
-      return NextResponse.json({ invoice: null, lines: [] });
+      // If no invoice found for this reservation, check if the reservation exists and auto-create the standard sequential invoice
+      const { data: res } = await supabaseServer
+        .from('reservations')
+        .select('*')
+        .eq('id', reservationId)
+        .maybeSingle();
+
+      if (res) {
+        try {
+          const { data: seqValue, error: seqErr } = await supabaseServer.rpc('next_invoice_no');
+          if (!seqErr && seqValue != null) {
+            const invoiceNo = formatInvoiceNo(Number(seqValue));
+            const allServiceIds = Array.isArray(res.service_ids) && res.service_ids.length > 0
+              ? res.service_ids
+              : (res.service_id ? [res.service_id] : []);
+
+            let branchName: string | null = null;
+            if (res.branch_id) {
+              const { data: bObj } = await supabaseServer.from('branches').select('name_en, name_ar').eq('id', res.branch_id).maybeSingle();
+              if (bObj) branchName = bObj.name_en || bObj.name_ar || null;
+            }
+
+            let services: any[] = [];
+            if (allServiceIds.length > 0) {
+              const { data: sData } = await supabaseServer.from('services').select('id, en, ar, price, branch_pricing').in('id', allServiceIds);
+              if (sData) services = sData;
+            }
+
+            const invLines = services.map((svc: any) => {
+              const priceDetails = getServicePriceDetails(
+                { price: svc.price !== null ? Number(svc.price) : 0, branchPricing: svc.branch_pricing },
+                branchName
+              );
+              return buildInvoiceLine({
+                lineType: 'service',
+                description: svc.en || svc.ar || `Service #${svc.id}`,
+                qty: 1,
+                unitPrice: priceDetails.basePrice,
+                discount: priceDetails.basePrice - priceDetails.discountedPrice,
+                serviceId: svc.id,
+                providerId: res.provider_id ?? undefined,
+              });
+            });
+
+            if (invLines.length === 0 && Number(res.amount_paid || res.amount_left || 0) > 0) {
+              invLines.push(buildInvoiceLine({
+                lineType: 'service',
+                description: `Service #${res.service_id || 'Booking'}`,
+                qty: 1,
+                unitPrice: Number(res.amount_paid || 0) + Number(res.amount_left || 0),
+                discount: 0,
+                serviceId: res.service_id || undefined,
+                providerId: res.provider_id ?? undefined,
+              }));
+            }
+
+            const totals = buildInvoiceTotals(invLines);
+            const { data: newInv, error: createErr } = await supabaseServer
+              .from('invoices')
+              .insert({
+                invoice_no: invoiceNo,
+                reservation_id: res.id,
+                customer_id: res.customer_id,
+                branch_id: res.branch_id,
+                subtotal: totals.subtotal,
+                discount_total: totals.discountTotal,
+                grand_total: totals.grandTotal,
+                status: Number(res.amount_paid || 0) >= totals.grandTotal && totals.grandTotal > 0 ? 'paid' : 'issued',
+              })
+              .select('id, invoice_no, reservation_id, customer_id, branch_id, issued_at, subtotal, discount_total, grand_total, status')
+              .single();
+
+            if (!createErr && newInv) {
+              invoice = newInv;
+              if (invLines.length > 0) {
+                await supabaseServer.from('invoice_lines').insert(
+                  invLines.map((l) => ({ ...l, invoice_id: newInv.id }))
+                );
+              }
+              if (Number(res.amount_paid || 0) > 0) {
+                await supabaseServer.from('payments').insert({
+                  invoice_id: newInv.id,
+                  amount: Number(res.amount_paid),
+                  method: 'cash',
+                  reference: invoiceNo,
+                });
+              }
+            }
+          }
+        } catch (autoInvErr) {
+          console.error('Auto-creating invoice for reservation failed:', autoInvErr);
+        }
+      }
+
+      if (!invoice) {
+        return NextResponse.json({ invoice: null, lines: [] });
+      }
     }
 
     // Fetch invoice lines with joined service/product names for bilingual display

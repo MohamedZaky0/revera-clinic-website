@@ -1344,6 +1344,56 @@ Specifically, `amountLeft` in the `reservations` table MUST reflect the true unp
 - **Debt Settlement Automatic Ledger Recording**: When a patient settles debt via `POST /api/customers/settle-debt`, each allocated settlement automatically writes an `outstanding_payment` transaction with the specified payment method and reference number, immediately reducing patient debt and increasing today's net payments.
 - **System Test Suite**: Verified under `TC-102` in the Admin Settings System Test Suite.
 
+### 13. Cash Drawer / Till Transaction Isolation & Multi-Installment Checkout Settlement Rule
+**Enforced in:** `src/app/api/reservations/route.ts`, `src/lib/transactionLedger.ts`, `src/app/admin/page.tsx`, `src/components/admin/transactions/TransactionsView.tsx`
+- **Elimination of Phantom Service Charge Transactions**: Services rendered and line items belong on invoices (`invoices`, `invoice_lines`), not as cash drawer movements. The automatic recording of `type: 'service_charge'` in `writeCheckoutInvoice` is eliminated so non-cash invoice generation never generates misleading green positive transactions in the transactions till table.
+- **Service Charge Display Neutrality**: Any legacy or manual `service_charge` transactions in `TransactionsView.tsx` render neutrally in indigo (`EGP X,XXX`) without a `+` symbol or green color, clearly distinguishing non-cash billing value from actual cash-in movements.
+- **Multiple Payment Installments at Checkout**: When a booking balance is paid over multiple installments on the same day (e.g. deposit, followed by remaining balance settlement via Checkout modal), each payment creates a separate, distinct transaction (`type: 'payment'` or `type: 'outstanding_payment'`) with its own timestamp, payment method, and amount.
+- **Checkout Modal Input Fallback**: In `AdminPage` Checkout Modal, if the user leaves the payment input unedited (displaying the placeholder for `netDue`), `amountPaidNum` falls back to `netDue` rather than 0, preventing accidental 0 EGP payment submissions and ensuring subsequent balance payments are captured.
+- **Resilient Invoice Payment Appending**: In `appendPaymentToExistingInvoice`, queries the most recent issued invoice using `.order('created_at', { ascending: false }).limit(1)` rather than `.maybeSingle()`, preventing `PGRST116` errors if multiple invoices exist, with an explicit fallback to directly record an `outstanding_payment` transaction so cash movements are never lost.
+- **Strict Default Values in Transaction Ledger**: `recordTransaction` defaults `payment_method` to `'cash'`, `status` to `'completed'`, and `source` to `'automatic'` so no transaction row is inserted with missing required ledger fields.
+
+### 14. Unique Payment Sequence References & Manual Booking Invoice Normalization Rule
+**Enforced in:** `src/app/api/reservations/route.ts`, `src/app/api/invoices/route.ts`, `src/app/api/customers/settle-debt/route.ts`, `src/lib/transactionLedger.ts`, `src/lib/printUtils.ts`, `src/app/admin/page.tsx`
+- **Unique Payment Reference Generation**: Every cash movement and payment against an invoice or reservation (initial booking deposit, checkout balance settlement, debt settlement, or manual transaction) MUST have its own unique sequence reference (`INV-XXXXXX`) generated atomically via `next_invoice_no()`. Multiple payments against the same invoice or reservation MUST NEVER duplicate reference numbers in `payments` or `transactions`.
+- **Authoritative Manual Booking Invoice Creation**: When a manual booking is created (`POST /api/reservations` with `isManual: true`), an authoritative invoice row (`invoices`) and itemized service lines (`invoice_lines`) are immediately created with an atomic sequential `INV-XXXXXX` number. If an initial payment is recorded, a payment row (`payments`) and ledger transaction (`recordTransaction`) are created referencing this invoice number.
+- **Invoice Number Normalization & Legacy Fallback Elimination**: The legacy prefix `REV-INV-${id.slice(0, 8)}` and UUID-slice fallbacks (`INV-${id.slice(0, 8)}`) are strictly eliminated across modal previews, receipts, and PDF prints (`printUtils.ts`, `admin/page.tsx`). All surfaces display official sequential `INV-XXXXXX` numbers.
+- **Lazy Auto-Creation for Un-invoiced Bookings**: In `GET /api/invoices?reservationId=X`, if a valid booking does not yet have an invoice row, the route automatically creates the standard sequential `INV-XXXXXX` invoice, itemized lines, and payment records on-the-fly, returning a valid ledger invoice and eliminating null/fallback scenarios.
+- **System Test Suite**: Verified under `TC-103` in the Admin Settings System Test Suite.
+
+### 15. Payment Status Calculation & Multi-Session Debt Settlement Engine Rule
+**Enforced in:** `src/components/admin/bookings/AdminBookingsView.tsx`, `src/components/admin/bookings/BookingDetailsModal.tsx`, `src/components/admin/reception/ReceptionDashboardView.tsx`, `src/components/admin/patients/CustomerProfileDrawer.tsx`, `src/components/admin/patients/SettleDebtModal.tsx`, `src/app/api/customers/settle-debt/route.ts`, `src/app/admin/page.tsx`
+- **Strict Payment Status Threshold**:
+  - A booking or session is strictly labeled **"Unpaid"** whenever `amountPaid < 1` (even if status is `completed`, `checked_in`, etc., as long as `amountLeft > 0`).
+  - **"Partially Paid"** strictly starts at `amountPaid >= 1` EGP with remaining debt (`amountLeft > 0`).
+  - **"Paid"** is assigned when remaining debt is zero (`amountLeft <= 0`) or for zero-cost completed/historical bookings.
+  - Applied consistently across All Appointments table (`AdminBookingsView.tsx`), Booking Details drawer badge (`BookingDetailsModal.tsx`), Reception Dashboard bookings table (`ReceptionDashboardView.tsx`), and Patient Profile Booking History (`CustomerProfileDrawer.tsx`).
+- **Settle Balance Gating**:
+  - The "Settle Balance" button in the patient financial summary card (`CustomerProfileDrawer.tsx`) is strictly hidden unless the patient has outstanding debt (`customer.outstanding > 0`) and the user has `customers.action_settle_balance` permission.
+  - `SettleDebtModal.tsx` contains a zero-debt guard alert informing staff if the patient has no outstanding balance.
+- **Per-Session Itemized Debt Breakdown & Selection**:
+  - `GET /api/customers/settle-debt?customerId=...` retrieves the patient's balance and an itemized breakdown of all unpaid sessions (`amount_left > 0`), including session date, time slot, resolved service names, doctor name, invoice number, total price, amount paid, and remaining debt.
+  - When called with no `customerId`, `GET /api/customers/settle-debt` returns `{ success: true, status: 'operational' }` for diagnostic pings by the System Test Suite.
+  - `SettleDebtModal.tsx` provides an interactive session picker displaying all unpaid sessions. Selecting a session auto-fills the settlement amount with that session's exact remaining balance. Selecting "All Sessions" auto-fills total outstanding debt.
+  - `POST /api/customers/settle-debt` accepts an optional `reservationId`. When provided and not `'all'`, it targets only that specific reservation, validating that `amount <= amount_left`, updating the reservation's `amount_paid` and `amount_left`, appending a payment with an atomic `INV-XXXXXX` reference, logging an `outstanding_payment` transaction in the financial ledger, and reducing the customer's `outstanding` and increasing `spent_amount`. If omitted or `'all'`, it falls back to FIFO oldest-first settlement across unpaid bookings.
+- **System Test Suite**: Verified under `TC-104` in the Admin Settings System Test Suite.
+
+### 16. Doctor Prescription Persistence, Non-UUID Safety & Real-Time Booking Details Synchronization Rule
+**Enforced in:** `src/app/api/prescriptions/route.ts`, `src/components/admin/bookings/BookingDetailsModal.tsx`, `src/components/admin/doctor/tabs/DoctorOngoingSessionTab.tsx`, `src/app/admin/page.tsx`
+- **Postgres Non-UUID Safety (`22P02`)**:
+  - In `POST /api/prescriptions`, synthetic/non-UUID reservation IDs (e.g., `'1780826201251-408'` or local test IDs) are guarded with UUID regex (`/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i`).
+  - Synthetic non-UUID IDs are preserved in `basePrescriptionData.booking_id`, the API response, and local fallback storage (`data/prescriptions.json`), but are cleanly omitted when querying Supabase `reservations` or inserting into `prescriptions.booking_id` to prevent fatal Postgres syntax error `22P02`.
+  - Postgres errors `22P02` and `23503` (Foreign Key violation) are caught with automatic fallback to insert without `booking_id`.
+- **Composite Customer & Date Fallback Query**:
+  - `GET /api/prescriptions` supports `customerId` and `date` parameters. If a query by `bookingId` returns no matches (e.g. prescription created with unlinked synthetic booking ID), the route automatically falls back to finding the customer's prescription for that session date.
+- **Real-Time Cross-Component Broadcast Sync**:
+  - `BookingDetailsModal.tsx` subscribes to `revera-prescription-change` and `revera-booking-change` window events. When a doctor writes or updates a prescription in `DoctorOngoingSessionTab.tsx`, open Booking Details modals immediately reload and display the recorded prescription without requiring drawer close or page reload.
+- **End Session Form Pre-Population**:
+  - When opening the End Session view in `BookingDetailsModal.tsx`, previously recorded prescription details (diagnosis, medications, instructions, follow-up) automatically pre-fill the form, and saving carries forward the existing prescription ID for clean versioning rather than creating disconnected duplicate records.
+- **Doctor Session Unsaved Auto-Save**:
+  - When the doctor clicks "Complete Treatment" in `DoctorOngoingSessionTab.tsx`, any unsaved prescription data entered in the form is automatically persisted before completing the booking.
+- **System Test Suite**: Verified under `TC-105` in the Admin Settings System Test Suite.
+
 ---
 
 ## Rules added after the 2026-07-30 pass (DEC-113 to DEC-121, RISK-128)
@@ -1358,3 +1408,4 @@ Specifically, `amountLeft` in the `reservations` table MUST reflect the true unp
 7. **Patient Total Spend and Outstanding** (DEC-121): Total Spend is the sum of `amount_paid` over delivered bookings (approved, confirmed, completed, started). The patients list and the profile card show the larger of the stored `customers` figure and the figure calculated from bookings; Outstanding is the larger of the stored value and the sum of `amount_left` over completed bookings.
 8. **Staff see only their own profile data** (RISK-128): `/api/profile*` return the caller's own employee row, attendance and pay summary. Target progress sums `amount_paid` on the caller's own bookings in completed, confirmed, approved and started status (a doctor's: assigned to them; staff: created by them). The provider row is matched strictly (id, phone, national id or exact name; exactly one match or none).
 9. **The browser never reads tables with the public key** (RISK-128): every table has RLS on with no open policy, so any read from the browser returns nothing; reads go through authenticated API routes.
+

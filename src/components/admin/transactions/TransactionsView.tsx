@@ -731,8 +731,8 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
 
                       {/* Amount */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
-                        <span className={`font-extrabold ${isNegative ? "text-rose-600" : "text-emerald-700"}`}>
-                          {isNegative ? `- EGP ${absAmt.toLocaleString()}` : Number(tx.amount) > 0 ? `+ EGP ${absAmt.toLocaleString()}` : `EGP ${absAmt.toLocaleString()}`}
+                        <span className={`font-extrabold ${tx.type === "service_charge" ? "text-indigo-700" : isNegative ? "text-rose-600" : "text-emerald-700"}`}>
+                          {tx.type === "service_charge" ? `EGP ${absAmt.toLocaleString()}` : isNegative ? `- EGP ${absAmt.toLocaleString()}` : Number(tx.amount) > 0 ? `+ EGP ${absAmt.toLocaleString()}` : `EGP ${absAmt.toLocaleString()}`}
                         </span>
                       </td>
 
