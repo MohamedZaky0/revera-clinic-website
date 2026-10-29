@@ -1277,6 +1277,7 @@ filled in with the above.
 - [RISK-138](#risk-138) — A Patient With Bookings Could Not Be Deleted For Good; The Owner's Rule Is That Permanent Delete Removes Everything (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
 - [RISK-139](#risk-139) — Permanently Deleting A Booking Left Its Payments And Money In The Patient's Figures (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
 - [RISK-140](#risk-140) — Anyone On The Internet Could Read Every Doctor's Phone, Email, National ID And Salary From The Public Doctors Endpoint (RESOLVED ON DEV, NOT YET ON PRODUCTION)
+- [RISK-143](#risk-143) — A Checkout Could Leave An Invoice Without Lines, A Payment Could Land On A Void Invoice, And Fully-Paid Manual Bookings Got No Invoice At All (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER)
 - [RISK-144](#risk-144) — A Booking Could Show, And Silently Re-Version, Another Booking's Prescription When The Same Patient Had Two Visits The Same Day (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER)
 
 ## RISK-003: Patient Auth Is Non-Functional
