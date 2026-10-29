@@ -106,6 +106,8 @@ export async function findReservationInvoice(
     .from('invoices')
     .select('id, invoice_no, customer_id, branch_id')
     .eq('reservation_id', reservationId)
+    // only an issued invoice can take a payment; a void one must never (RISK-143, same rule as appendPaymentToExistingInvoice)
+    .eq('status', 'issued')
     .order('created_at', { ascending: false })
     .limit(1);
   if (error) return { invoice: null, error: error.message };

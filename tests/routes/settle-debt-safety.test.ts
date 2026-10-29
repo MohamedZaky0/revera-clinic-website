@@ -113,6 +113,18 @@ describe('a failed money record never leaves a paid booking (finding 1)', () => 
     expectNoMoneyRecords();
   });
 
+  it('a void invoice never receives the payment: only the transaction is recorded (RISK-143)', async () => {
+    fake.seed('invoices', [{ id: 'inv-void', reservation_id: 'res-1', invoice_no: 'INV-000900', status: 'void', customer_id: CUSTOMER_ID, branch_id: null, created_at: '2026-01-02T00:00:00Z' }]);
+
+    const res = await POST(makeReq({ customerId: CUSTOMER_ID, amount: 200, reservationId: 'res-1' }));
+
+    expect(res.status).toBe(200);
+    expect(fake.rows('payments')).toHaveLength(0);
+    expect(fake.rows('transactions')).toHaveLength(1);
+    expect(booking('res-1').amount_left).toBe(0);
+    expect(customer().outstanding).toBe(0);
+  });
+
   it('a booking without an invoice records only the transaction, and a failure there changes nothing', async () => {
     fake.seed('invoices', []);
     hook = (c) => (c.table === 'transactions' && c.op === 'insert' ? FAIL : undefined);
