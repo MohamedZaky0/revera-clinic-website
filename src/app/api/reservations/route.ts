@@ -327,6 +327,115 @@ async function applyCheckoutCosting(params: {
   }
 }
 
+/**
+ * DEC-139. `invoices.status` is CHECK (draft | issued | void) - there is no 'paid' status; whether
+ * an invoice is settled is derived from its payments. Writing 'paid' made the insert fail, which
+ * the callers swallow as non-fatal, so the booking silently got no invoice while the sequence
+ * number was already burned. Every invoice written at booking / first-view time is 'issued'.
+ */
+const INVOICE_STATUS_ISSUED = 'issued';
+
+/**
+ * Draws the next sequential receipt reference (INV-XXXXXX) for a payment, or returns null if the
+ * sequence RPC fails or throws. A reference is a label on a payment that has already been decided
+ * - it must never be able to fail the payment (DEC-139); callers fall back to
+ * fallbackPaymentReference() on null.
+ */
+async function drawPaymentReference(): Promise<string | null> {
+  try {
+    const { data, error } = await supabaseServer.rpc('next_invoice_no');
+    if (error || data == null || !Number.isFinite(Number(data))) {
+      console.warn('next_invoice_no failed while drawing a payment reference:', error?.message ?? 'no value');
+      return null;
+    }
+    return formatInvoiceNo(Number(data));
+  } catch (err) {
+    console.warn('next_invoice_no threw while drawing a payment reference:', err);
+    return null;
+  }
+}
+
+/**
+ * Reference used when the sequence is unavailable: the invoice number suffixed with the payment's
+ * ordinal, so a second/third payment never reuses the first payment's reference.
+ */
+function fallbackPaymentReference(invoiceNo: string | null | undefined, existingPaymentCount: number): string | null {
+  if (!invoiceNo) return null;
+  return existingPaymentCount > 0 ? `${invoiceNo}-P${existingPaymentCount + 1}` : invoiceNo;
+}
+
+/**
+ * Replaces the lines of an invoice that already exists (written at manual-booking time) with the
+ * authoritative checkout lines without ever leaving it line-less (DEC-139).
+ *
+ * Order matters: insert the new lines first, then the header, and only then remove the old lines.
+ * If anything fails the new rows are removed again and the header is put back, so the invoice is
+ * exactly as it was; the caller sees the error (it is already non-fatal for the checkout itself).
+ */
+async function rewriteExistingInvoiceLines(
+  existing: { id: string; subtotal?: number | null; discount_total?: number | null; grand_total?: number | null; status?: string | null },
+  newLines: ReturnType<typeof buildInvoiceLine>[],
+  totals: ReturnType<typeof buildInvoiceTotals>,
+): Promise<Array<{ id: string; service_id: number | null; line_total: number }>> {
+  const { data: oldLines, error: oldErr } = await supabaseServer
+    .from('invoice_lines')
+    .select('id')
+    .eq('invoice_id', existing.id);
+  if (oldErr) throw oldErr;
+  const oldIds = (oldLines || []).map((l: any) => l.id);
+
+  const { data: inserted, error: insertErr } = await supabaseServer
+    .from('invoice_lines')
+    .insert(newLines.map((line) => ({ ...line, invoice_id: existing.id })))
+    .select('id, service_id, line_total');
+  if (insertErr) throw insertErr; // old lines and header untouched
+  const insertedRows = (inserted || []) as Array<{ id: string; service_id: number | null; line_total: number }>;
+  if (newLines.length > 0 && insertedRows.length === 0) {
+    throw new Error('Invoice lines insert returned no rows; keeping the existing lines.');
+  }
+  const newIds = insertedRows.map((l) => l.id);
+
+  const removeNewLines = async () => {
+    if (newIds.length === 0) return;
+    const { error } = await supabaseServer.from('invoice_lines').delete().in('id', newIds);
+    if (error) console.error('Failed to roll back newly inserted invoice lines:', error.message, '| invoice:', existing.id);
+  };
+
+  const { error: headerErr } = await supabaseServer
+    .from('invoices')
+    .update({
+      subtotal: totals.subtotal,
+      discount_total: totals.discountTotal,
+      grand_total: totals.grandTotal,
+      status: INVOICE_STATUS_ISSUED,
+    })
+    .eq('id', existing.id);
+  if (headerErr) {
+    await removeNewLines();
+    throw headerErr;
+  }
+
+  if (oldIds.length > 0) {
+    const { error: deleteErr } = await supabaseServer.from('invoice_lines').delete().in('id', oldIds);
+    if (deleteErr) {
+      await removeNewLines();
+      const { error: restoreErr } = await supabaseServer
+        .from('invoices')
+        .update({
+          subtotal: existing.subtotal ?? 0,
+          discount_total: existing.discount_total ?? 0,
+          grand_total: existing.grand_total ?? 0,
+          status: existing.status ?? INVOICE_STATUS_ISSUED,
+        })
+        .eq('id', existing.id);
+      if (restoreErr) console.error('Failed to restore invoice header after a failed line rewrite:', restoreErr.message, '| invoice:', existing.id);
+      throw deleteErr;
+    }
+  }
+
+  return insertedRows;
+}
+
 async function writeCheckoutInvoice(params: {
   reservationId: string;
   customerId: string | null;
@@ -527,17 +636,22 @@ async function writeCheckoutInvoice(params: {
   const allLines = [...lines, ...addonLines];
   const totals = buildInvoiceTotals(allLines);
 
-  // Check if an invoice already exists for this reservation (e.g. from manual booking)
-  const { data: existingInvoices } = await supabaseServer
+  // Check if an invoice already exists for this reservation (e.g. from manual booking).
+  // A void invoice is never reused or resurrected (DEC-139) - it is a cancelled document - and if
+  // the lookup itself fails we stop rather than write a second invoice next to the real one.
+  const { data: existingInvoices, error: existingInvErr } = await supabaseServer
     .from('invoices')
     .select('id, invoice_no, grand_total, subtotal, discount_total, status')
     .eq('reservation_id', reservationId)
+    .neq('status', 'void')
     .order('created_at', { ascending: false })
     .limit(1);
+  if (existingInvErr) throw existingInvErr;
   const existingInvoice = existingInvoices && existingInvoices.length > 0 ? existingInvoices[0] : null;
 
   let invoice: any = existingInvoice;
   let invoiceNo = existingInvoice?.invoice_no;
+  let invoiceLines: Array<{ id: string; service_id: number | null; line_total: number }> | null = null;
 
   if (!invoice) {
     // Atomic — public.next_invoice_no() wraps nextval(invoice_no_seq) server-side
@@ -558,32 +672,24 @@ async function writeCheckoutInvoice(params: {
         subtotal: totals.subtotal,
         discount_total: totals.discountTotal,
         grand_total: totals.grandTotal,
-        status: 'issued',
+        status: INVOICE_STATUS_ISSUED,
       })
       .select('id, invoice_no')
       .single();
     if (invoiceErr) throw invoiceErr;
     invoice = newInvoice;
+
+    const { data: insertedLines, error: linesErr } = await supabaseServer.from('invoice_lines').insert(
+      allLines.map((line: ReturnType<typeof buildInvoiceLine>) => ({ ...line, invoice_id: invoice.id }))
+    ).select('id, service_id, line_total');
+    if (linesErr) throw linesErr;
+    invoiceLines = insertedLines;
   } else {
-    // Re-synchronize existing invoice totals with completed settlement
-    await supabaseServer
-      .from('invoices')
-      .update({
-        subtotal: totals.subtotal,
-        discount_total: totals.discountTotal,
-        grand_total: totals.grandTotal,
-        status: 'issued',
-      })
-      .eq('id', invoice.id);
-
-    // Delete provisional lines so authoritative lines with costing can be inserted
-    await supabaseServer.from('invoice_lines').delete().eq('invoice_id', invoice.id);
+    // Re-synchronize the existing invoice with the completed settlement. The provisional lines
+    // are swapped for the authoritative (costable) ones insert-first, so a failure part-way can
+    // never leave the invoice with totals and no lines (DEC-139).
+    invoiceLines = await rewriteExistingInvoiceLines(existingInvoice!, allLines, totals);
   }
-
-  const { data: invoiceLines, error: linesErr } = await supabaseServer.from('invoice_lines').insert(
-    allLines.map((line: ReturnType<typeof buildInvoiceLine>) => ({ ...line, invoice_id: invoice.id }))
-  ).select('id, service_id, line_total');
-  if (linesErr) throw linesErr;
 
   if (pendingReservationProducts && pendingReservationProducts.length > 0) {
     const { error: markInvoicedErr } = await supabaseServer
@@ -610,29 +716,26 @@ async function writeCheckoutInvoice(params: {
   // Calculate new money collected at checkout
   const newMoneyAtCheckout = amountPaid - Math.max(0, priorPaid);
 
-  // Determine unique receipt/payment reference for this checkout payment.
-  // Every payment MUST have its own unique sequence reference (INV-XXXXXX) so multiple
-  // installments/payments on the same reservation never duplicate invoice numbers.
-  let checkoutPaymentRef = paymentReference || null;
-  if (!checkoutPaymentRef) {
-    if (priorPaid > 0) {
-      const { data: seqVal } = await supabaseServer.rpc('next_invoice_no');
-      if (seqVal != null) {
-        checkoutPaymentRef = formatInvoiceNo(Number(seqVal));
-      } else {
-        checkoutPaymentRef = invoiceNo;
-      }
-    } else {
-      checkoutPaymentRef = invoiceNo;
-    }
-  }
-
   // Query existing payments on this invoice to avoid double-recording
   const { data: existingPayments } = await supabaseServer
     .from('payments')
     .select('id, amount')
     .eq('invoice_id', invoice.id);
   const totalExistingPayments = (existingPayments || []).reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
+
+  // Determine unique receipt/payment reference for this checkout payment.
+  // Every payment MUST have its own unique sequence reference (INV-XXXXXX) so multiple
+  // installments/payments on the same reservation never duplicate invoice numbers. The reference
+  // is only a label: a sequence failure degrades to "<invoice no>-P<n>" instead of failing a
+  // checkout whose invoice is already written, and no number is drawn when no payment row will be
+  // written (DEC-139).
+  const willWritePayment = totalExistingPayments > 0 ? newMoneyAtCheckout > 0 : amountPaid > 0;
+  let checkoutPaymentRef = paymentReference || null;
+  if (!checkoutPaymentRef) {
+    checkoutPaymentRef = priorPaid > 0 && willWritePayment
+      ? (await drawPaymentReference()) ?? fallbackPaymentReference(invoiceNo, (existingPayments || []).length)
+      : invoiceNo;
+  }
 
   if (totalExistingPayments > 0) {
     if (newMoneyAtCheckout > 0) {
@@ -715,10 +818,17 @@ export async function appendPaymentToExistingInvoice(
 ): Promise<boolean> {
   if (amount <= 0) return false;
 
+  // Only an 'issued' invoice can take a payment (DEC-139). invoices.status is CHECK
+  // (draft | issued | void) and an invoice stays 'issued' however much has been paid - there is no
+  // 'paid' status - so this covers later installments and overpayments on a settled invoice while
+  // excluding void (cancelled) and draft (not yet issued) ones. With several issued invoices the
+  // newest wins (the previous maybeSingle() threw). No qualifying invoice -> false, and the caller
+  // records a standalone transaction instead.
   const { data: invoices, error: findErr } = await supabaseServer
     .from('invoices')
     .select('id, invoice_no, customer_id, branch_id')
     .eq('reservation_id', reservationId)
+    .eq('status', INVOICE_STATUS_ISSUED)
     .order('created_at', { ascending: false })
     .limit(1);
   if (findErr) {
@@ -728,11 +838,20 @@ export async function appendPaymentToExistingInvoice(
   const invoice = invoices && invoices.length > 0 ? invoices[0] : null;
   if (!invoice) return false;
 
+  // The reference is a label on a payment that is already decided: a failing sequence must not
+  // fail the payment or leave it unreferenced. Degrades to "<invoice no>-P<n>" (unique per payment).
   let effectiveRef = paymentReference || null;
   if (!effectiveRef) {
-    const { data: seqVal } = await supabaseServer.rpc('next_invoice_no');
-    if (seqVal != null) {
-      effectiveRef = formatInvoiceNo(Number(seqVal));
+    effectiveRef = await drawPaymentReference();
+    if (!effectiveRef) {
+      let existingPaymentCount = 0;
+      try {
+        const { data: existing } = await supabaseServer.from('payments').select('id').eq('invoice_id', invoice.id);
+        existingPaymentCount = (existing || []).length;
+      } catch (countErr) {
+        console.warn('appendPaymentToExistingInvoice could not count existing payments (non-fatal):', countErr);
+      }
+      effectiveRef = fallbackPaymentReference(invoice.invoice_no, existingPaymentCount);
     }
   }
 
@@ -1372,7 +1491,7 @@ export async function POST(req: Request) {
       try {
         const { data: seqValue, error: seqErr } = await supabaseServer.rpc('next_invoice_no');
         if (!seqErr && seqValue != null) {
-          generatedInvoiceNo = formatInvoiceNo(Number(seqValue));
+          const candidateInvoiceNo = formatInvoiceNo(Number(seqValue));
 
           const invLines = fetchedSvcs.map((svc: any) => {
             const priceDetails = getServicePriceDetails(
@@ -1406,24 +1525,40 @@ export async function POST(req: Request) {
           const { data: createdInv, error: invErr } = await supabaseServer
             .from('invoices')
             .insert({
-              invoice_no: generatedInvoiceNo,
+              invoice_no: candidateInvoiceNo,
               reservation_id: data.id,
               customer_id: data.customer_id,
               branch_id: data.branch_id,
               subtotal: totals.subtotal,
               discount_total: totals.discountTotal,
               grand_total: totals.grandTotal,
-              status: initialAmountPaid >= totals.grandTotal && totals.grandTotal > 0 ? 'paid' : 'issued',
+              // Always 'issued' (DEC-139): 'paid' is not a valid invoices.status, so the insert
+              // used to fail for every fully-paid manual booking. Paid-ness comes from payments.
+              status: INVOICE_STATUS_ISSUED,
             })
             .select('id, invoice_no')
             .single();
 
-          if (!invErr && createdInv) {
-            invoiceRecord = createdInv;
+          if (invErr || !createdInv) {
+            console.error('Manual booking invoice insert failed (non-fatal):', invErr?.message);
+          } else {
+            let linesWritten = true;
             if (invLines.length > 0) {
-              await supabaseServer.from('invoice_lines').insert(
+              const { error: lineInsertErr } = await supabaseServer.from('invoice_lines').insert(
                 invLines.map((line) => ({ ...line, invoice_id: createdInv.id }))
               );
+              if (lineInsertErr) {
+                linesWritten = false;
+                console.error('Manual booking invoice lines insert failed - removing the empty invoice (non-fatal):', lineInsertErr.message);
+                // Nothing references this invoice yet (no payment written), so it can go; the
+                // checkout (or GET /api/invoices) writes the real invoice later.
+                const { error: cleanupErr } = await supabaseServer.from('invoices').delete().eq('id', createdInv.id);
+                if (cleanupErr) console.error('Failed to remove the empty manual booking invoice:', cleanupErr.message, '| invoice:', createdInv.id);
+              }
+            }
+            if (linesWritten) {
+              invoiceRecord = createdInv;
+              generatedInvoiceNo = createdInv.invoice_no || candidateInvoiceNo;
             }
           }
         }
@@ -1436,13 +1571,16 @@ export async function POST(req: Request) {
       try {
         const paymentRef = body.paymentReference || generatedInvoiceNo || null;
         if (invoiceRecord) {
-          await supabaseServer.from('payments').insert({
+          const { error: bookingPaymentErr } = await supabaseServer.from('payments').insert({
             invoice_id: invoiceRecord.id,
             amount: initialAmountPaid,
             method: body.paymentMethod || 'cash',
             reference: paymentRef,
             received_by_employee_id: data.created_by_employee_id || null,
           });
+          // Non-fatal: the checkout writes the missing payments row (it sees no payments on the
+          // invoice and records the full amount paid), so the money is not lost.
+          if (bookingPaymentErr) console.error('Failed to write manual booking payment row (non-fatal):', bookingPaymentErr.message, '| reservation:', data.id);
         }
         const svcNames = fetchedSvcs.map((s: any) => s.en || s.ar || `Service #${s.id}`).join(' + ') || `Service #${data.service_id}`;
         await recordTransaction({

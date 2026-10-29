@@ -4193,3 +4193,34 @@ A failure in steps 2 to 5 undoes the earlier steps (figures restored, sessions t
    - Added unit test suite `tests/routes/prescriptions-booking-sync.test.ts` (5 passed).
    - Verified `DoctorOngoingSessionTab.test.tsx` (13 passed).
 
+
+---
+
+## DEC-139: Checkout Over An Existing Invoice Is Insert-First; Only An `issued` Invoice Takes A Payment; Invoice Status Is Never `paid`
+
+**Date:** 2026-10-29
+**Status:** Decided & implemented
+**Refines:** DEC-135 (manual-booking invoice, payment references) and the commit `23f103b` changes to `writeCheckoutInvoice` / `appendPaymentToExistingInvoice` (referred to as "DEC-106" in that commit message, which is a different decision).
+**Risk:** RISK-143. **Manual checklist:** `ai_docs/manual_tests/CHECKOUT_INVOICE_SAFETY_MANUAL_TESTS.md`.
+
+**Context:** a review of `23f103b` found four defects in the invoice-at-booking-time design:
+1. `writeCheckoutInvoice` reused the booking-time invoice by updating its totals, **deleting every `invoice_lines` row**, and only then inserting the authoritative lines. A failed insert left an invoice with totals and no lines. The header update's error was ignored, and the lookup took the newest invoice of the reservation whatever its status (a void invoice would have been resurrected to `issued`), and a failed lookup silently fell through to writing a second invoice.
+2. `appendPaymentToExistingInvoice` lost its `status = 'issued'` filter, so a payment could be attached to a void or draft invoice. It also drew a fresh `next_invoice_no` for every payment outside any guard: a throwing RPC aborted the whole payment (and, in `writeCheckoutInvoice`, aborted the checkout after the invoice and lines were written but before the payment row), and a failed RPC left the reference empty.
+3. The manual-booking invoice (`POST /api/reservations`) and the auto-created invoice (`GET /api/invoices`) were written with `status: 'paid'` when the booking was fully paid. `invoices.status` is `CHECK IN ('draft','issued','void')` (verified on the linked production database, 2026-10-29: constraint `invoices_status_check`, all 200 existing rows `issued`). The insert therefore failed, the error was swallowed as non-fatal, the invoice number was already burned, and the booking was left with **no invoice** - exactly for the fully-paid manual bookings the feature was meant for. Nothing in the UI reads an invoice `paid` status.
+4. In the same manual-booking block: a failed `invoice_lines` insert was ignored (invoice with totals and no lines), a failed `payments` insert was ignored, and the returned `invoiceNo` / payment reference pointed at an invoice that might not exist.
+
+**Decision:**
+1. **Insert-first line rewrite.** When a non-void invoice already exists, `rewriteExistingInvoiceLines` (new, in `src/app/api/reservations/route.ts`) (a) reads the old line ids, (b) inserts the new lines, (c) updates the header, (d) deletes the old lines **by id**. If (b) fails nothing has changed; if (c) or (d) fails the new lines are removed again and (for d) the old header values are restored, so the invoice is left exactly as it was and the error propagates (the checkout caller already treats it as non-fatal). An insert that returns zero rows is treated as a failure before anything is deleted. The no-existing-invoice path is unchanged. Consumption/stock rows are keyed by `reservation_id`, not by invoice line, so swapping lines orphans nothing.
+2. **Which invoice is reused / paid.** Checkout reuses the newest invoice that is **not void** (matches `GET /api/invoices`); if only void invoices exist it writes a new one, and a failed lookup now stops instead of writing a duplicate. `appendPaymentToExistingInvoice` accepts only `status = 'issued'` (newest wins; the old `maybeSingle()` threw on two). `issued` is the only payable state because **there is no `paid` status**: an invoice stays `issued` however much is paid, so later installments and overpayments on a settled invoice are still allowed, while void and draft invoices are excluded. No qualifying invoice returns `false` and the existing callers (`PATCH /api/reservations`, `/api/customers/settle-debt`) fall back to a standalone `outstanding_payment` transaction, as before. The exported signature is unchanged.
+3. **References degrade, never fail.** New `drawPaymentReference()` wraps `next_invoice_no` in try/catch and returns null on error/throw/empty; callers fall back to `<invoice no>-P<n>` (n = ordinal of the payment on that invoice, so references stay distinct). A number is drawn only after an invoice that can take the payment was found, and at checkout only when a payment row will actually be written. A payment-insert failure after a successful draw can still skip one number - a sequence cannot be rolled back; this is the same trade-off DEC-106 describes for gaps.
+4. **Status is always `issued`** for invoices written at manual-booking time and by `GET /api/invoices` (paid-ness is derived from `payments`). The manual-booking block now checks the `invoice_lines` insert (a line-less new invoice is deleted again, `invoiceNo` is only returned/used as a payment reference when the invoice really exists) and logs a failed `payments` insert (the checkout writes the missing payments row because it sees none on the invoice).
+
+**Not done / by design:**
+- No migration and no schema change; `DB_SCHEMA.md` already documents the status CHECK.
+- Amount paid greater than the invoice total still writes the full amount as the payment row (the overpayment goes to the wallet through the separate `walletDeposit` instruction). That is the long-standing checkout behaviour and was not touched.
+- Invoice numbers already burned by the failing `'paid'` inserts are not renumbered; no booking-time invoice exists for those bookings, `GET /api/invoices` creates one on first view.
+- `src/app/api/customers/settle-debt/route.ts` was deliberately not edited (another change is in flight there); it benefits through the shared function.
+
+**Tests:** `tests/routes/checkout-invoice-safety.test.ts` (21): old lines survive an insert failure and a delete failure, void/draft invoices are never chosen or paid, fallback to a standalone transaction, RPC error and RPC throw degrade with distinct references, valid invoice status for paid/unpaid/overpaid manual bookings and the auto-created invoice, line-less invoice cleanup. Full suite and `tsc --noEmit` clean.
+
+---

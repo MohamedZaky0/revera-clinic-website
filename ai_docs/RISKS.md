@@ -5898,3 +5898,26 @@ See `PROPOSALS.md` for:
 - Identical gap for **products** (Edit checks `product_ids`/`productIds`/`.products` but the API field is `attachedProducts`, so products also fall through to notes-regex 100% of the time) and for **products/services sync on PATCH** — reported to Mohamed, needs its own brief (wider blast radius, per the brief's out-of-scope).
 - POST step 7a writes `line_type: 'service'` for the primary service — rejected by the CHECK constraint (`product`/`additional_service`/`device_pulses` only) and swallowed by the unchecked `await`; primary-service line rows are likely never written. Reported, not fixed.
 - No backfill of pre-migration rows — they stay `NULL`, the notes fallback covers display. No browser verification yet.
+
+## RISK-143: A Checkout Could Leave An Invoice Without Lines, A Payment Could Land On A Void Invoice, And Fully-Paid Manual Bookings Got No Invoice At All (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER)
+
+**Manual test checklist:** `ai_docs/manual_tests/CHECKOUT_INVOICE_SAFETY_MANUAL_TESTS.md` · **Decision:** DEC-139
+
+**Severity:** High (money records) · **Type:** Data integrity / error handling
+**Found:** 2026-10-29, code review of commit `23f103b` (invoice created at manual-booking time, unique payment references).
+
+**Causes found:**
+1. `writeCheckoutInvoice` replaced the lines of an existing invoice by delete-then-insert; a failed insert left totals with no lines. Header update errors were ignored; a void invoice could be picked and flipped back to `issued`; a failed lookup produced a second invoice.
+2. `appendPaymentToExistingInvoice` no longer filtered on `status = 'issued'`: a payment could be recorded against a void or draft invoice instead of falling back to a standalone transaction. A throwing or failing `next_invoice_no` aborted the payment (or the checkout after the invoice was written) or left the reference empty.
+3. Manual-booking and auto-created invoices were inserted with `status: 'paid'` for fully-paid bookings, rejected by `invoices_status_check` (draft | issued | void). The error was swallowed, an invoice number was burned and the booking had no invoice and no `payments` row.
+4. Unchecked `invoice_lines` / `payments` inserts in the manual-booking block.
+
+**Fix:** see DEC-139 - insert-first line rewrite with rollback, non-void reuse, `issued`-only payable invoices, reference draw that degrades to `<invoice no>-P<n>`, status always `issued`, checked inserts in the manual-booking block. No migration.
+
+**Tests:** `tests/routes/checkout-invoice-safety.test.ts` (21 tests, written failing first: 16 failed before the fix). Full suite 1842 passed, `tsc --noEmit` clean.
+
+**Not done / still open:**
+- No browser verification yet (the checklist is the evidence log to fill in).
+- Invoice numbers burned by the former failing `'paid'` inserts stay skipped; there is no back-fill.
+- An overpayment still produces a `payments` row larger than the invoice total (wallet credit is a separate instruction) - unchanged, pre-existing.
+- A payment insert that fails after a reference was drawn can still skip one invoice number (sequences cannot be rolled back).
