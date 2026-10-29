@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { requireStaffAccess } from '@/lib/access';
-import { appendPaymentToExistingInvoice } from '@/app/api/reservations/route';
-import { recordTransaction } from '@/lib/transactionLedger';
-import { formatInvoiceNo } from '@/lib/ledger';
+import { applySettlement, findReservationInvoice, type SettlementItem } from '@/lib/debtSettlement';
+import { round2 } from '@/lib/bookingDeletion';
 
 export const dynamic = 'force-dynamic';
 
@@ -192,6 +191,23 @@ export async function POST(req: Request) {
       }, { status: 400 });
     }
 
+    const employeeId = access.access.employee?.id || null;
+    const employeeBranchId = (access.access.employee as any)?.branch_id || null;
+    const paymentReference = body.paymentReference || null;
+
+    // Reads first, writes last: the plan below is built from reads only. Nothing is written until
+    // applySettlement runs, and it writes the money record before the booking balance and the
+    // patient's figures, and undoes everything if any step fails (DEC-138).
+    const run = async (items: SettlementItem[]) =>
+      applySettlement({
+        customer: { id: customer.id, outstanding: customer.outstanding, spent_amount: customer.spent_amount },
+        items,
+        paymentMethod,
+        paymentReference,
+        employeeId,
+        employeeBranchId,
+      });
+
     // ── Targeted Settlement: Specific session requested ──
     if (reservationId && reservationId !== 'all') {
       const { data: targetRes, error: targetErr } = await supabaseServer
@@ -217,70 +233,33 @@ export async function POST(req: Request) {
           }, { status: 400 });
         }
 
-        const portion = parsedAmount;
-        const newPaid = Number(targetRes.amount_paid || 0) + portion;
-        const newLeft = owed - portion;
-
-        const { error: updErr } = await supabaseServer
-          .from('reservations')
-          .update({ amount_paid: newPaid, amount_left: newLeft })
-          .eq('id', targetRes.id);
-
-        if (updErr) {
-          console.error(`settle-debt failed to update target reservation ${targetRes.id}:`, updErr.message);
-          return NextResponse.json({ error: 'Failed to update reservation balance.' }, { status: 500 });
+        const { invoice, error: invLookupErr } = await findReservationInvoice(targetRes.id);
+        if (invLookupErr) {
+          console.error('settle-debt invoice lookup error:', invLookupErr);
+          return NextResponse.json({ error: 'Could not look up the booking\'s invoice. Nothing was changed.' }, { status: 500 });
         }
 
-        try {
-          const appended = await appendPaymentToExistingInvoice(
-            targetRes.id,
-            portion,
-            access.access.employee?.id || null,
-            paymentMethod,
-            body.paymentReference || null
-          );
-          if (!appended) {
-            await recordTransaction({
-              type: 'outstanding_payment',
-              amount: portion,
-              description: `Balance settlement for reservation ${targetRes.id.slice(0, 8)}`,
-              customerId,
-              branchId: targetRes.branch_id || (access.access.employee as any)?.branch_id || null,
-              reservationId: targetRes.id,
-              paymentMethod: paymentMethod || 'cash',
-              referenceNo: body.paymentReference || null,
-              createdByEmployeeId: access.access.employee?.id || null,
-              status: 'completed',
-              source: 'automatic',
-            });
-          }
-        } catch (payErr) {
-          console.error(`settle-debt failed to append payment for reservation ${targetRes.id} (non-fatal):`, payErr);
-        }
+        const outcome = await run([{
+          kind: 'reservation',
+          id: targetRes.id,
+          portion: parsedAmount,
+          date: targetRes.date ?? null,
+          paidBefore: Number(targetRes.amount_paid || 0),
+          leftBefore: owed,
+          branchId: targetRes.branch_id || null,
+          invoice,
+        }]);
+        if (!outcome.ok) return NextResponse.json(outcome.body, { status: outcome.status });
 
-        const settled = portion;
-        const newOutstanding = Math.max(0, currentOutstanding - settled);
-        const { error: balErr } = await supabaseServer
-          .from('customers')
-          .update({
-            outstanding: newOutstanding,
-            spent_amount: Number(customer.spent_amount || 0) + settled,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', customerId);
-
-        if (balErr) {
-          console.error('settle-debt balance update error:', balErr.message);
-          return NextResponse.json({ error: 'Payment was recorded but balances failed to update.' }, { status: 500 });
-        }
-
+        const settled = outcome.settled;
+        const applied = outcome.applied[0];
         return NextResponse.json({
           success: true,
           settled,
           unallocated: 0,
-          outstandingAfter: newOutstanding,
+          outstandingAfter: outcome.outstandingAfter,
           allocations: [{ reservationId: targetRes.id, amount: settled, date: targetRes.date ?? null }],
-          targetSession: { id: targetRes.id, newPaid, newLeft },
+          targetSession: { id: targetRes.id, newPaid: applied.newPaid, newLeft: applied.newLeft },
           paymentMethod,
           note: note || null,
           message: `Settled EGP ${settled.toLocaleString()} for session on ${targetRes.date || ''}.`,
@@ -301,7 +280,7 @@ export async function POST(req: Request) {
           .select('amount')
           .eq('invoice_id', targetInv.id);
         const totalPaid = (payRows || []).reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
-        const invOwed = Math.max(0, Number(targetInv.grand_total || 0) - totalPaid);
+        const invOwed = Math.max(0, round2(Number(targetInv.grand_total || 0) - totalPaid));
         if (invOwed <= 0) {
           return NextResponse.json({ error: 'The selected invoice is already fully paid.' }, { status: 400 });
         }
@@ -311,54 +290,21 @@ export async function POST(req: Request) {
           }, { status: 400 });
         }
 
-        let effectiveRef = body.paymentReference || null;
-        if (!effectiveRef) {
-          const { data: seqVal } = await supabaseServer.rpc('next_invoice_no');
-          if (seqVal != null) effectiveRef = formatInvoiceNo(Number(seqVal));
-        }
+        const outcome = await run([{
+          kind: 'invoice',
+          id: targetInv.id,
+          portion: parsedAmount,
+          date: targetInv.created_at ?? null,
+          invoiceNo: targetInv.invoice_no ?? null,
+        }]);
+        if (!outcome.ok) return NextResponse.json(outcome.body, { status: outcome.status });
 
-        const portion = parsedAmount;
-        try {
-          await supabaseServer.from('payments').insert({
-            invoice_id: targetInv.id,
-            amount: portion,
-            method: paymentMethod,
-            reference: effectiveRef,
-            received_by_employee_id: access.access.employee?.id || null,
-          });
-          await recordTransaction({
-            type: 'outstanding_payment',
-            amount: portion,
-            description: `Balance settlement for invoice ${targetInv.invoice_no || ''}`.trim(),
-            customerId,
-            branchId: (access.access.employee as any)?.branch_id || null,
-            invoiceId: targetInv.id,
-            paymentMethod: paymentMethod || 'cash',
-            referenceNo: effectiveRef,
-            createdByEmployeeId: access.access.employee?.id || null,
-            status: 'completed',
-            source: 'automatic',
-          });
-        } catch (payErr) {
-          console.error(`settle-debt failed to append payment for invoice ${targetInv.id}:`, payErr);
-        }
-
-        const settled = portion;
-        const newOutstanding = Math.max(0, currentOutstanding - settled);
-        await supabaseServer
-          .from('customers')
-          .update({
-            outstanding: newOutstanding,
-            spent_amount: Number(customer.spent_amount || 0) + settled,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', customerId);
-
+        const settled = outcome.settled;
         return NextResponse.json({
           success: true,
           settled,
           unallocated: 0,
-          outstandingAfter: newOutstanding,
+          outstandingAfter: outcome.outstandingAfter,
           allocations: [{ reservationId: targetInv.id, amount: settled, date: targetInv.created_at ?? null }],
           paymentMethod,
           note: note || null,
@@ -384,55 +330,34 @@ export async function POST(req: Request) {
     }
 
     let remaining = parsedAmount;
-    const applied: { reservationId: string; amount: number; date: string | null }[] = [];
+    const plan: SettlementItem[] = [];
+    // Money this plan will put on each invoice, so the invoice pass below does not count a booking's
+    // own invoice a second time.
+    const plannedOnInvoice = new Map<string, number>();
 
     for (const r of unpaid || []) {
       if (remaining <= 0) break;
       const owed = Number(r.amount_left || 0);
       if (owed <= 0) continue;
 
-      const portion = Math.min(owed, remaining);
-      const newPaid = Number(r.amount_paid || 0) + portion;
-      const newLeft = owed - portion;
-
-      const { error: updErr } = await supabaseServer
-        .from('reservations')
-        .update({ amount_paid: newPaid, amount_left: newLeft })
-        .eq('id', r.id);
-      if (updErr) {
-        console.error(`settle-debt failed to update reservation ${r.id}:`, updErr.message);
-        break;
+      const portion = round2(Math.min(owed, remaining));
+      const { invoice, error: invLookupErr } = await findReservationInvoice(r.id);
+      if (invLookupErr) {
+        console.error('settle-debt invoice lookup error:', invLookupErr);
+        return NextResponse.json({ error: 'Could not look up a booking\'s invoice. Nothing was changed.' }, { status: 500 });
       }
-
-      try {
-        const appended = await appendPaymentToExistingInvoice(
-          r.id,
-          portion,
-          access.access.employee?.id || null,
-          paymentMethod,
-          body.paymentReference || null
-        );
-        if (!appended) {
-          await recordTransaction({
-            type: 'outstanding_payment',
-            amount: portion,
-            description: `Balance settlement for reservation ${r.id.slice(0, 8)}`,
-            customerId,
-            branchId: r.branch_id || (access.access.employee as any)?.branch_id || null,
-            reservationId: r.id,
-            paymentMethod: paymentMethod || 'cash',
-            referenceNo: body.paymentReference || null,
-            createdByEmployeeId: access.access.employee?.id || null,
-            status: 'completed',
-            source: 'automatic',
-          });
-        }
-      } catch (payErr) {
-        console.error(`settle-debt failed to append payment for reservation ${r.id} (non-fatal):`, payErr);
-      }
-
-      applied.push({ reservationId: r.id, amount: portion, date: r.date ?? null });
-      remaining -= portion;
+      if (invoice) plannedOnInvoice.set(invoice.id, round2((plannedOnInvoice.get(invoice.id) || 0) + portion));
+      plan.push({
+        kind: 'reservation',
+        id: r.id,
+        portion,
+        date: r.date ?? null,
+        paidBefore: Number(r.amount_paid || 0),
+        leftBefore: owed,
+        branchId: r.branch_id || null,
+        invoice,
+      });
+      remaining = round2(remaining - portion);
     }
 
     if (remaining > 0) {
@@ -451,74 +376,38 @@ export async function POST(req: Request) {
           .select('amount')
           .eq('invoice_id', inv.id);
         const totalPaid = (payRows || []).reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
-        const invOwed = Math.max(0, Number(inv.grand_total || 0) - totalPaid);
+        const invOwed = Math.max(0, round2(Number(inv.grand_total || 0) - totalPaid - (plannedOnInvoice.get(inv.id) || 0)));
         if (invOwed <= 0) continue;
 
-        const portion = Math.min(invOwed, remaining);
-        let effectiveRef = body.paymentReference || null;
-        if (!effectiveRef) {
-          const { data: seqVal } = await supabaseServer.rpc('next_invoice_no');
-          if (seqVal != null) effectiveRef = formatInvoiceNo(Number(seqVal));
-        }
-
-        try {
-          await supabaseServer.from('payments').insert({
-            invoice_id: inv.id,
-            amount: portion,
-            method: paymentMethod,
-            reference: effectiveRef,
-            received_by_employee_id: access.access.employee?.id || null,
-          });
-          await recordTransaction({
-            type: 'outstanding_payment',
-            amount: portion,
-            description: `Balance settlement for invoice ${inv.invoice_no || ''}`.trim(),
-            customerId,
-            branchId: (access.access.employee as any)?.branch_id || null,
-            invoiceId: inv.id,
-            paymentMethod: paymentMethod || 'cash',
-            referenceNo: effectiveRef,
-            createdByEmployeeId: access.access.employee?.id || null,
-            status: 'completed',
-            source: 'automatic',
-          });
-        } catch (payErr) {
-          console.error(`settle-debt failed to append payment for invoice ${inv.id}:`, payErr);
-        }
-
-        applied.push({ reservationId: inv.id, amount: portion, date: inv.created_at ?? null });
-        remaining -= portion;
+        const portion = round2(Math.min(invOwed, remaining));
+        plan.push({
+          kind: 'invoice',
+          id: inv.id,
+          portion,
+          date: inv.created_at ?? null,
+          invoiceNo: inv.invoice_no ?? null,
+        });
+        remaining = round2(remaining - portion);
       }
     }
 
-    const settled = parsedAmount - remaining;
-    if (settled <= 0) {
+    if (plan.length === 0) {
       return NextResponse.json({
         error: 'No unpaid bookings were found to settle this payment against.',
       }, { status: 400 });
     }
 
-    // Move the customer scalars by exactly what was actually applied.
-    const { error: balErr } = await supabaseServer
-      .from('customers')
-      .update({
-        outstanding: Math.max(0, currentOutstanding - settled),
-        spent_amount: Number(customer.spent_amount || 0) + settled,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', customerId);
+    // Every allocation is applied, or none is (and the response says so).
+    const outcome = await run(plan);
+    if (!outcome.ok) return NextResponse.json(outcome.body, { status: outcome.status });
 
-    if (balErr) {
-      console.error('settle-debt balance update error:', balErr.message);
-      return NextResponse.json({ error: 'Payment was recorded but balances failed to update.' }, { status: 500 });
-    }
-
+    const settled = outcome.settled;
     return NextResponse.json({
       success: true,
       settled,
       unallocated: remaining,
-      outstandingAfter: Math.max(0, currentOutstanding - settled),
-      allocations: applied,
+      outstandingAfter: outcome.outstandingAfter,
+      allocations: outcome.applied.map((a) => ({ reservationId: a.reservationId, amount: a.amount, date: a.date })),
       paymentMethod,
       note: note || null,
       message: remaining > 0

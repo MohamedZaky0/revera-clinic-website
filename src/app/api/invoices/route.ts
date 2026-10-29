@@ -108,7 +108,10 @@ export async function GET(req: Request) {
                 subtotal: totals.subtotal,
                 discount_total: totals.discountTotal,
                 grand_total: totals.grandTotal,
-                status: Number(res.amount_paid || 0) >= totals.grandTotal && totals.grandTotal > 0 ? 'paid' : 'issued',
+                // 'issued' regardless of how much is paid (DEC-139): invoices.status is CHECK
+                // (draft | issued | void), so the former 'paid' made this insert fail and burned
+                // an invoice number for every already-settled booking. Paid-ness comes from payments.
+                status: 'issued',
               })
               .select('id, invoice_no, reservation_id, customer_id, branch_id, issued_at, subtotal, discount_total, grand_total, status')
               .single();

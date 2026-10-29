@@ -54,6 +54,7 @@ import { extractPulsePackageQuota } from "@/lib/laserDeficit";
 import { resolveLaserPulseRate } from "@/lib/laserRate";
 import LaserDeficitPrompt from "./LaserDeficitPrompt";
 import { CLIENT } from "@/config/client";
+import { prescriptionsForBooking, pickPrescriptionForBooking } from "@/lib/prescriptionBooking";
 import { allocateServicePrices } from "@/lib/historicalServicePrices";
 
 export interface AdditionalServiceItem {
@@ -551,11 +552,12 @@ function BookingDetailsModal({
       const res = await fetch(`/api/prescriptions?${params.toString()}`, { headers: authenticatedJsonHeaders });
       if (res.ok) {
         const data = await res.json();
-        const rxList = Array.isArray(data) ? data : (data?.prescriptions || []);
+        // DEC-140: never show/version a prescription that is linked to a different booking.
+        const rxList = prescriptionsForBooking<any>(Array.isArray(data) ? data : (data?.prescriptions || []), bookId);
         setDrawerPrescriptions(rxList);
 
         // Pre-fill the inline prescription form (for end_session mode) if existing prescription found
-        const matchingRx = rxList.find((rx: any) => String(rx.booking_id) === String(bookId)) || rxList[0];
+        const matchingRx = pickPrescriptionForBooking<any>(rxList, bookId);
         if (matchingRx) {
           setExistingRxId(matchingRx.id || null);
           if (matchingRx.diagnosis) {

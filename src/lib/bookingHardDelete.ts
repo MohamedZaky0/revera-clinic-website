@@ -40,13 +40,13 @@ export type HardDeleteOutcome =
 
 const WALLET_TYPES = new Set(['wallet_topup', 'wallet_deduction']);
 
-type Undo = { label: string; run: () => Promise<string | null> };
+export type Undo = { label: string; run: () => Promise<string | null> };
 
 function fail(status: number, error: string, extra: Record<string, any> = {}): HardDeleteOutcome {
   return { ok: false, status, body: { error, ...extra } };
 }
 
-async function runUndo(undos: Undo[]): Promise<string[]> {
+export async function runUndo(undos: Undo[]): Promise<string[]> {
   const failures: string[] = [];
   for (const u of [...undos].reverse()) {
     try {
@@ -59,7 +59,7 @@ async function runUndo(undos: Undo[]): Promise<string[]> {
   return failures;
 }
 
-function eqOrNull(query: any, column: string, raw: unknown) {
+export function eqOrNull(query: any, column: string, raw: unknown) {
   return raw === null || raw === undefined ? query.is(column, null) : query.eq(column, raw);
 }
 

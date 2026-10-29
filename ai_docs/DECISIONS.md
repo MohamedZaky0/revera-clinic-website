@@ -1,6 +1,6 @@
 # DECISIONS.md — Revera Clinics Decision Log
 
-> **Last Updated:** 2026-10-21 (docs audit: duplicate DEC-025 heading renamed, migration-status lines of DEC-088/110/111/113/114/117 brought up to date; the highest number in use is DEC-122). 2026-10-26: DEC-134 added (highest number in use is now DEC-134)
+> **Last Updated:** 2026-10-29 (DEC-138 added). 2026-10-21 (docs audit: duplicate DEC-025 heading renamed, migration-status lines of DEC-088/110/111/113/114/117 brought up to date; the highest number in use is DEC-122). 2026-10-26: DEC-134 added (highest number in use is now DEC-134)
 > **Previous content was for a different project — discarded entirely**
 > **Rule:** Before changing any decision recorded here, read the full entry first.
 
@@ -4192,4 +4192,80 @@ A failure in steps 2 to 5 undoes the earlier steps (figures restored, sessions t
    - Added test case `TC-105: Doctor Prescription & Booking Details Real-Time Sync Engine` to the Admin Settings System Test Suite (`INITIAL_SYSTEM_TEST_SUITES`).
    - Added unit test suite `tests/routes/prescriptions-booking-sync.test.ts` (5 passed).
    - Verified `DoctorOngoingSessionTab.test.tsx` (13 passed).
+---
 
+
+---
+
+## DEC-139: Checkout Over An Existing Invoice Is Insert-First; Only An `issued` Invoice Takes A Payment; Invoice Status Is Never `paid`
+
+**Date:** 2026-10-29
+**Status:** Decided & implemented
+**Refines:** DEC-135 (manual-booking invoice, payment references) and the commit `23f103b` changes to `writeCheckoutInvoice` / `appendPaymentToExistingInvoice` (referred to as "DEC-106" in that commit message, which is a different decision).
+**Risk:** RISK-143. **Manual checklist:** `ai_docs/manual_tests/CHECKOUT_INVOICE_SAFETY_MANUAL_TESTS.md`.
+
+**Context:** a review of `23f103b` found four defects in the invoice-at-booking-time design:
+1. `writeCheckoutInvoice` reused the booking-time invoice by updating its totals, **deleting every `invoice_lines` row**, and only then inserting the authoritative lines. A failed insert left an invoice with totals and no lines. The header update's error was ignored, and the lookup took the newest invoice of the reservation whatever its status (a void invoice would have been resurrected to `issued`), and a failed lookup silently fell through to writing a second invoice.
+2. `appendPaymentToExistingInvoice` lost its `status = 'issued'` filter, so a payment could be attached to a void or draft invoice. It also drew a fresh `next_invoice_no` for every payment outside any guard: a throwing RPC aborted the whole payment (and, in `writeCheckoutInvoice`, aborted the checkout after the invoice and lines were written but before the payment row), and a failed RPC left the reference empty.
+3. The manual-booking invoice (`POST /api/reservations`) and the auto-created invoice (`GET /api/invoices`) were written with `status: 'paid'` when the booking was fully paid. `invoices.status` is `CHECK IN ('draft','issued','void')` (verified on the linked production database, 2026-10-29: constraint `invoices_status_check`, all 200 existing rows `issued`). The insert therefore failed, the error was swallowed as non-fatal, the invoice number was already burned, and the booking was left with **no invoice** - exactly for the fully-paid manual bookings the feature was meant for. Nothing in the UI reads an invoice `paid` status.
+4. In the same manual-booking block: a failed `invoice_lines` insert was ignored (invoice with totals and no lines), a failed `payments` insert was ignored, and the returned `invoiceNo` / payment reference pointed at an invoice that might not exist.
+
+**Decision:**
+1. **Insert-first line rewrite.** When a non-void invoice already exists, `rewriteExistingInvoiceLines` (new, in `src/app/api/reservations/route.ts`) (a) reads the old line ids, (b) inserts the new lines, (c) updates the header, (d) deletes the old lines **by id**. If (b) fails nothing has changed; if (c) or (d) fails the new lines are removed again and (for d) the old header values are restored, so the invoice is left exactly as it was and the error propagates (the checkout caller already treats it as non-fatal). An insert that returns zero rows is treated as a failure before anything is deleted. The no-existing-invoice path is unchanged. Consumption/stock rows are keyed by `reservation_id`, not by invoice line, so swapping lines orphans nothing.
+2. **Which invoice is reused / paid.** Checkout reuses the newest invoice that is **not void** (matches `GET /api/invoices`); if only void invoices exist it writes a new one, and a failed lookup now stops instead of writing a duplicate. `appendPaymentToExistingInvoice` accepts only `status = 'issued'` (newest wins; the old `maybeSingle()` threw on two). `issued` is the only payable state because **there is no `paid` status**: an invoice stays `issued` however much is paid, so later installments and overpayments on a settled invoice are still allowed, while void and draft invoices are excluded. No qualifying invoice returns `false` and the existing callers (`PATCH /api/reservations`, `/api/customers/settle-debt`) fall back to a standalone `outstanding_payment` transaction, as before. The exported signature is unchanged.
+3. **References degrade, never fail.** New `drawPaymentReference()` wraps `next_invoice_no` in try/catch and returns null on error/throw/empty; callers fall back to `<invoice no>-P<n>` (n = ordinal of the payment on that invoice, so references stay distinct). A number is drawn only after an invoice that can take the payment was found, and at checkout only when a payment row will actually be written. A payment-insert failure after a successful draw can still skip one number - a sequence cannot be rolled back; this is the same trade-off DEC-106 describes for gaps.
+4. **Status is always `issued`** for invoices written at manual-booking time and by `GET /api/invoices` (paid-ness is derived from `payments`). The manual-booking block now checks the `invoice_lines` insert (a line-less new invoice is deleted again, `invoiceNo` is only returned/used as a payment reference when the invoice really exists) and logs a failed `payments` insert (the checkout writes the missing payments row because it sees none on the invoice).
+
+**Not done / by design:**
+- No migration and no schema change; `DB_SCHEMA.md` already documents the status CHECK.
+- Amount paid greater than the invoice total still writes the full amount as the payment row (the overpayment goes to the wallet through the separate `walletDeposit` instruction). That is the long-standing checkout behaviour and was not touched.
+- Invoice numbers already burned by the failing `'paid'` inserts are not renumbered; no booking-time invoice exists for those bookings, `GET /api/invoices` creates one on first view.
+- `src/app/api/customers/settle-debt/route.ts` was deliberately not edited (another change is in flight there); it benefits through the shared function.
+
+**Tests:** `tests/routes/checkout-invoice-safety.test.ts` (21): old lines survive an insert failure and a delete failure, void/draft invoices are never chosen or paid, fallback to a standalone transaction, RPC error and RPC throw degrade with distinct references, valid invoice status for paid/unpaid/overpaid manual bookings and the auto-created invoice, line-less invoice cleanup. Full suite and `tsc --noEmit` clean.
+
+---
+
+**Amended by DEC-140 (2026-10-29):** two parts of this decision were wrong in a way that could attach a prescription to the wrong visit. (a) `booking_id` is no longer copied from the request body; it is written only when the reservation exists, and the response reports what was really stored. (b) The `customerId` + `date` fallback in `GET /api/prescriptions` now returns only prescriptions with `booking_id IS NULL`, never another booking's. The real-time sync, pre-fill, versioning and auto-save parts of this decision stand unchanged.
+
+---
+
+## DEC-140: A Prescription Is Linked To A Booking Only When That Booking Exists, And The Per-Booking Fallback Never Returns Another Booking's Prescription
+
+**Date:** 2026-10-29
+**Status:** Decided & implemented (review of DEC-137 / commit `cbf8c28`). Risk: RISK-144. No migration.
+
+**Context:** Review of DEC-137 found two defects.
+1. `POST /api/prescriptions` used to attach `booking_id` only after checking that the reservation exists. DEC-137 removed that check and set `booking_id` straight from the request body (trimmed and UUID-shape checked), relying on the foreign key to reject unknown ids and on a retry. It also copied the requested id into the response even when the database row did not keep it, so the caller was told the prescription was linked when it was not.
+2. `GET /api/prescriptions?bookingId=&customerId=&date=`: when the booking had no prescription of its own, the fallback returned every prescription of that patient for that date (or all of the patient's latest prescriptions with no date). A patient with two bookings on the same day saw booking A's prescription inside booking B. In a clinical record, that is a mix-up, and the Booking Details and doctor session screens then pre-fill the form from it and, on save, create a new version of A's prescription (`id: existingRxId`).
+
+**Decision:**
+1. **POST.** `booking_id` is written only if the id is a UUID **and** one `reservations` lookup finds it (`resolveExistingBookingId`). Non-UUID ids never reach Postgres (no 22P02 round trip). Anything else (junk, `'undefined'`, a deleted or unknown booking) is saved **unlinked** (`booking_id` null): the save never fails and the prescription is never dropped. If the lookup itself errors, the id is kept and the insert's own retry stays as the net. The retry (now one helper, `insertPrescriptionRow`) still strips `booking_id` on a foreign-key/uuid rejection and when the column does not exist in an older database, and `follow_up_notes` when that column is missing. The response reports the stored value (`booking_id: null` when unlinked). The `reservations.follow_up_date` sync uses the booking the row is really linked to. A new version of an existing prescription keeps the original link when the request's id does not verify.
+2. **GET fallback.** Only when the booking has no prescription of its own: same `customer_id`, **`booking_id IS NULL`**, same `date` when given, latest versions unless `all_versions`. The same rule is applied in both in-memory (local JSON) branches via one helper, `filterLocalByBooking`. The local JSON store keeps the raw booking id on create (no foreign key there; legacy local bookings use non-UUID ids).
+3. **Callers.** `BookingDetailsModal.tsx` and `DoctorOngoingSessionTab.tsx` no longer take `rxList[0]` blindly: `src/lib/prescriptionBooking.ts` (`prescriptionsForBooking`, `pickPrescriptionForBooking`) keeps only this booking's own prescriptions or unlinked ones and prefers the booking's own. DEC-137's intent holds: a prescription written in a session is posted with that session's reservation id, so it is linked and appears in Booking Details at once; the null-booking fallback only serves older prescriptions saved before the link was reliable.
+
+**Alternatives rejected:** keeping the date fallback and trusting callers to filter (the API is the clinical boundary; a client filter is only a second net); requiring `date` for the fallback (the brief allows it without a date; callers always send it); adding a migration to backfill `booking_id` on old rows (cannot be done safely: it would be the same date-guess that caused the mix-up).
+
+**Known residual:** older prescriptions with `booking_id` null are still ambiguous when the same patient has two bookings on the same day; both bookings will offer that one prescription (it is shown only when the booking has none of its own, and saving it from a booking links it to that booking). Prescriptions saved from now on are linked.
+
+**Automated verification:** `tests/routes/prescriptions-booking-link.test.ts` (two bookings the same day, unlinked still found, no date, other patient/date excluded, unknown/invalid ids still save, real id attached, one lookup only for UUIDs, FK rejection and missing column fall back, version keeps link, follow-up sync only for a real booking), `tests/routes/prescriptions-booking-link-local.test.ts` (local JSON branches), `tests/lib/prescriptionBooking.test.ts`, and the updated non-UUID case in `tests/routes/prescriptions-booking-sync.test.ts`. Manual: `ai_docs/manual_tests/PRESCRIPTIONS_BOOKING_LINK_MANUAL_TESTS.md`.
+
+## DEC-138: Debt Settlement Writes The Money Record First, Undoes Everything On A Failure, And Moves The Patient's Figures With A Guarded Update
+
+**Date:** 2026-10-29 · **Status:** Done on dev (branch `fix/settle-debt-safety`); not yet on production; **no migration** · **Related:** RISK-142, DEC-136, DEC-106, DEC-133 (same ordered-steps-with-undo pattern), RISK-076
+
+**Context:** a code review of the per-session settlement (DEC-136, commit `23f103b`) found two defects in `POST /api/customers/settle-debt`: it wrote `reservations.amount_paid/amount_left` first, recorded the payment afterwards inside a try/catch that only logged ("non-fatal"), and then wrote `customers.outstanding/spent_amount` as absolute numbers computed from a read taken at the start of the request.
+
+**Decision:** the write half moved to `src/lib/debtSettlement.ts` (`applySettlement`); the route keeps validation and builds the plan from reads only. Response shape and status codes of the existing cases are unchanged (`SettleDebtModal` keeps working).
+1. **Order (per allocation): money record first, booking second.** (a) the `payments` row, when the booking has an invoice (newest invoice of the booking, the same lookup `appendPaymentToExistingInvoice` uses) or when the target is a standalone invoice; (b) the `transactions` row (`outstanding_payment`) through the new `recordTransactionStrict` (`src/lib/transactionLedger.ts`), which returns the row id and throws on failure, unlike `recordTransaction`, which stays non-fatal for every other caller; (c) the booking balance, written only if the booking still holds the `amount_paid`/`amount_left` that were read (compare-and-set). A booking can no longer show as paid without a payment row and transaction behind it. If the process dies between (b) and (c), the books show a payment the booking does not, which matches the cash actually taken and is visible.
+2. **All or nothing.** The FIFO loop no longer `break`s on a failed update with the earlier bookings left applied. Any failure in any allocation, or in the final step, undoes every earlier write (booking restored with a guarded update, transaction and payment rows deleted by id) and answers "The payment was not applied and nothing was changed" (500, or 409 for the two conflict cases). If an undo step itself fails the answer carries `partial: true`, `undoFailures` and `applied` (each allocation still in place with `leftover`: `booking balance`, `payment row` or `transaction row`). When a booking's balance cannot be restored its payment and transaction are deliberately kept, so the booking and the ledger still agree.
+3. **Patient figures (`outstanding`, `spent_amount`) are the commit point and are race-safe.** The update is a compare-and-set (`.eq('outstanding', previous)` and `.eq('spent_amount', previous)`, null-safe via `eqOrNull`). If it matches no row, the figures are re-read and the same delta (`outstanding - settled`, floored at 0; `spent + settled`) is applied to the fresh values, up to 5 attempts; after that `409 PATIENT_FIGURES_CHANGED` and everything is undone. Two settlements for one patient at the same moment therefore both count. The same style of guard `hardDeleteBooking` uses (DEC-133).
+4. **Two settlements racing for the same booking:** the second one's guarded booking update matches nothing, it undoes its own payment and answers `409 BOOKING_CHANGED`; the money is not taken twice.
+5. **FIFO planning reads everything before writing.** A booking's own invoice is counted once: the invoice pass subtracts what the plan already puts on each invoice (before, the invoice pass re-read payments after the booking loop had written them).
+6. The errors that used to be swallowed are now real: the standalone-invoice branch ignored the payment insert error and the patient update error; both are failures now.
+
+**Why a guarded update and not a Postgres function:** a function (`outstanding = outstanding - x, spent_amount = spent_amount + x`) would make step 3 one statement, but it needs a migration that could not be applied or tested from here, and the guarded update gives the same result. If settlement volume ever makes 5 attempts too few, the function is the next step.
+
+**Known limits (not changed):** still not one database transaction (a stalled write, RISK-131, can leave an undo undone; the answer says so). The sequence number drawn for the receipt reference (`next_invoice_no`) is not given back on a failure, so a failed attempt leaves a gap in the INV numbers. `findReservationInvoice` repeats the invoice lookup of `appendPaymentToExistingInvoice` (reservations route); if that lookup changes, change both.
+
+**Tests:** `tests/routes/settle-debt-safety.test.ts` (18 cases; 15 failed against the old route) with the fault/race helper `tests/helpers/supabaseFaults.ts`; `tests/routes/settle-debt.test.ts` unchanged and passing. Manual checklist: `ai_docs/manual_tests/SETTLE_DEBT_SAFETY_MANUAL_TESTS.md`.

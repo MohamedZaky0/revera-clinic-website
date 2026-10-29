@@ -2326,7 +2326,7 @@ All are `GET`, need a staff token plus the permission shown, and take `branchId?
 Staff only. Manages digital clinical prescriptions and immutable version history (DEC-137, TC-056, TC-105).
 
 ### GET /api/prescriptions
-Fetches prescriptions. Supports querying by booking (`bookingId`), customer (`customerId`), and session date (`date`). If `bookingId` yields no record, automatically falls back to finding the customer's prescription for the given date.
+Fetches prescriptions. Supports querying by booking (`bookingId`), customer (`customerId`), and session date (`date`). If `bookingId` yields no record, falls back to the customer's prescriptions that were saved without any booking (`booking_id` null) for the given date (all dates if `date` is omitted). It never returns a prescription linked to a different booking (DEC-140).
 - **Query Params:** `bookingId` (optional), `customerId` (optional), `date` (optional), `includeHistory` (boolean, default false).
 - **Response:** `{ prescriptions: Prescription[] }` or array of prescriptions.
 
@@ -2335,7 +2335,7 @@ Creates or updates (versions) a digital clinical prescription.
 - **Body:** `{ booking_id?, customer_id, customer_name, doctor_id, doctor_name, diagnosis, medications, instructions, follow_up_date?, follow_up_notes?, id? }`.
 - **Behavior:**
   - If `id` is provided, versions the existing prescription: creates new row with `version = previous.version + 1`, `is_latest = true`, linking `parent_prescription_id` and `root_prescription_id`, and setting previous to `is_latest = false`.
-  - Safely handles non-UUID `booking_id` (strips from Supabase insert if non-UUID to prevent Postgres `22P02` syntax error, while preserving `booking_id` in API response and local JSON fallback).
+  - `booking_id` is stored only when it is a UUID and the reservation exists (one lookup). Otherwise the prescription is saved unlinked and the response has `booking_id: null`; the save never fails because of the id (DEC-140). The local JSON fallback keeps the raw id.
   - Automatically updates `reservations.follow_up_date` if follow-up is specified and `booking_id` is a valid UUID.
 - **Response:** `{ success: true, prescription: Prescription }`.
 

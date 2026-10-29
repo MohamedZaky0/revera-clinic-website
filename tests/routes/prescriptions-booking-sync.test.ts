@@ -85,7 +85,7 @@ describe('POST /api/prescriptions - Booking Linkage & Non-UUID Safety', () => {
     expect(data.is_latest).toBe(true);
   });
 
-  it('safely handles non-UUID booking_id without throwing 22P02, and attaches booking_id in response', async () => {
+  it('safely handles non-UUID booking_id without throwing 22P02: saves the prescription unlinked and reports booking_id null', async () => {
     const payload = {
       booking_id: NON_UUID_BOOKING_ID,
       customer_id: CUST_ID,
@@ -100,7 +100,9 @@ describe('POST /api/prescriptions - Booking Linkage & Non-UUID Safety', () => {
     const data = await res.json();
 
     expect(data.id).toBeTruthy();
-    expect(data.booking_id).toBe(NON_UUID_BOOKING_ID);
+    // DEC-140: the response reports what is stored, never a link that was not written.
+    expect(data.booking_id).toBeNull();
+    expect(fake.rows('prescriptions')[0].booking_id).toBeNull();
     expect(data.diagnosis).toBe('Post-Laser Care');
   });
 
