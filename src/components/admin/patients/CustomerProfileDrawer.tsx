@@ -491,6 +491,16 @@ export default function CustomerProfileDrawer({
           <ArrowLeft size={14} /> {t.backBtn}
         </button>
         <div className="flex items-center gap-2">
+          {Number(viewingCustomerProfile.outstanding || 0) > 0 && (!hasPermission || hasPermission("customers.action_settle_balance")) && (
+            <button
+              onClick={() => setShowSettleModal(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 cursor-pointer"
+              title={lang === "ar" ? "تسوية المديونية" : "Settle Balance"}
+            >
+              <ReceiptText size={12} className="shrink-0 text-rose-600" />
+              <span>{t.settleBalanceBtn || "Settle Balance"}</span>
+            </button>
+          )}
           {(!hasPermission || hasPermission("bookings.action_add_previous") || hasPermission("bookings.create")) && onAddPreviousBooking && (
             <button
               onClick={() => onAddPreviousBooking(viewingCustomerProfile)}
@@ -681,17 +691,6 @@ export default function CustomerProfileDrawer({
                     <span>{t.outstanding || "Outstanding"}</span>
                   </span>
                   <div className="flex items-center gap-1.5">
-                    {Number(viewingCustomerProfile.outstanding || 0) > 0 && (!hasPermission || hasPermission("customers.action_settle_balance")) && (
-                      <button
-                        type="button"
-                        onClick={() => setShowSettleModal(true)}
-                        className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-300/70 px-2 py-0.5 rounded-md transition cursor-pointer"
-                        title={lang === "ar" ? "تسوية المديونية" : "Settle Balance"}
-                      >
-                        <ReceiptText size={10} />
-                        <span>{t.settleBalanceBtn || "Settle Balance"}</span>
-                      </button>
-                    )}
                     {adminRole === "superadmin" && (
                       <button
                         type="button"

@@ -33,7 +33,7 @@ export async function GET(req: Request) {
   try {
     const { data: customer, error: custErr } = await supabaseServer
       .from('customers')
-      .select('id, name, outstanding, spent_amount')
+      .select('id, name, mobile, outstanding, spent_amount')
       .eq('id', customerId)
       .maybeSingle();
 
@@ -48,7 +48,7 @@ export async function GET(req: Request) {
     // Query unpaid reservations (amount_left > 0), excluding cancelled and rejected
     const { data: unpaidRes, error: resErr } = await supabaseServer
       .from('reservations')
-      .select('id, date, time_slot, requested_time, service_id, service_ids, doctor_name, amount_paid, amount_left, total_price, price, status, notes')
+      .select('id, date, time_slot, requested_time, service_id, service_ids, doctor_name, amount_paid, amount_left, status, notes')
       .eq('customer_id', customerId)
       .gt('amount_left', 0)
       .not('status', 'in', '("cancelled","rejected")')
@@ -59,9 +59,26 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Could not load unpaid bookings.' }, { status: 500 });
     }
 
+    // Fallback by phone if customer has mobile
+    let phoneRes: any[] = [];
+    if (customer.mobile) {
+      const existingIds = new Set((unpaidRes || []).map((r: any) => r.id));
+      const { data: byPhone } = await supabaseServer
+        .from('reservations')
+        .select('id, date, time_slot, requested_time, service_id, service_ids, doctor_name, amount_paid, amount_left, status, notes')
+        .eq('phone', customer.mobile)
+        .gt('amount_left', 0)
+        .not('status', 'in', '("cancelled","rejected")')
+        .order('date', { ascending: true });
+
+      phoneRes = (byPhone || []).filter((r: any) => !existingIds.has(r.id));
+    }
+
+    const allUnpaidRes = [...(unpaidRes || []), ...phoneRes];
+
     // Batch resolve service names
     const allSvcIds = Array.from(new Set(
-      (unpaidRes || []).flatMap((r: any) => {
+      allUnpaidRes.flatMap((r: any) => {
         if (Array.isArray(r.service_ids) && r.service_ids.length > 0) return r.service_ids.map(Number);
         if (r.service_id) return [Number(r.service_id)];
         return [];
@@ -82,7 +99,7 @@ export async function GET(req: Request) {
     }
 
     // Batch resolve invoice numbers for reservations
-    const resIds = (unpaidRes || []).map((r: any) => r.id);
+    const resIds = allUnpaidRes.map((r: any) => r.id);
     const invMap: Record<string, string> = {};
     if (resIds.length > 0) {
       const { data: invRows } = await supabaseServer
@@ -96,14 +113,14 @@ export async function GET(req: Request) {
       }
     }
 
-    const unpaidSessions = (unpaidRes || []).map((r: any) => {
+    const unpaidFromRes = allUnpaidRes.map((r: any) => {
       const sIds: number[] = Array.isArray(r.service_ids) && r.service_ids.length > 0
         ? r.service_ids.map(Number)
         : (r.service_id ? [Number(r.service_id)] : []);
       const sNames = sIds.map((id) => svcMap[id] || `Service #${id}`).join(', ');
       const paid = Number(r.amount_paid || 0);
       const left = Number(r.amount_left || 0);
-      const total = Number(r.total_price || r.price || (paid + left));
+      const total = paid + left;
 
       return {
         id: r.id,
@@ -119,6 +136,55 @@ export async function GET(req: Request) {
         invoiceNo: invMap[r.id] || null,
       };
     });
+
+    // Also query unpaid issued invoices (standalone or not already in reservations)
+    const existingResIds = new Set(allUnpaidRes.map((r: any) => r.id));
+    const { data: issuedInvoices } = await supabaseServer
+      .from('invoices')
+      .select('id, invoice_no, grand_total, status, reservation_id, customer_id, created_at')
+      .eq('customer_id', customerId)
+      .eq('status', 'issued')
+      .order('created_at', { ascending: true });
+
+    const unpaidFromInvoices: any[] = [];
+    if (issuedInvoices && issuedInvoices.length > 0) {
+      const invIds = issuedInvoices.map((inv: any) => inv.id);
+      const { data: payRows } = await supabaseServer
+        .from('payments')
+        .select('invoice_id, amount')
+        .in('invoice_id', invIds);
+
+      const payMap: Record<string, number> = {};
+      for (const p of payRows || []) {
+        payMap[p.invoice_id] = (payMap[p.invoice_id] || 0) + Number(p.amount || 0);
+      }
+
+      for (const inv of issuedInvoices) {
+        if (inv.reservation_id && existingResIds.has(inv.reservation_id)) {
+          continue;
+        }
+        const grandTotal = Number(inv.grand_total || 0);
+        const paid = Number(payMap[inv.id] || 0);
+        const left = Math.max(0, grandTotal - paid);
+        if (left > 0) {
+          unpaidFromInvoices.push({
+            id: inv.id,
+            type: 'invoice',
+            date: inv.created_at ? inv.created_at.split('T')[0] : '',
+            time: null,
+            serviceName: inv.invoice_no ? `Invoice ${inv.invoice_no}` : 'Issued Invoice',
+            doctorName: null,
+            totalPrice: grandTotal,
+            amountPaid: paid,
+            amountLeft: left,
+            status: 'issued',
+            invoiceNo: inv.invoice_no || null,
+          });
+        }
+      }
+    }
+
+    const unpaidSessions = [...unpaidFromRes, ...unpaidFromInvoices];
 
     return NextResponse.json({
       customer: {

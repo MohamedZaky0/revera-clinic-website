@@ -73,16 +73,20 @@ export default function SettleDebtModal({ customer, onClose, onSettled, lang = "
           if (isMounted) {
             const list: UnpaidSession[] = Array.isArray(data.unpaidSessions) ? data.unpaidSessions : [];
             setUnpaidSessions(list);
-            if (list.length === 1) {
-              setSelectedSessionId(list[0].id);
-              setAmount(String(list[0].amountLeft));
-            } else if (list.length > 1) {
-              // Default to first session
+            if (list.length > 0) {
               setSelectedSessionId(list[0].id);
               setAmount(String(list[0].amountLeft));
             } else {
+              setSelectedSessionId(null);
               setAmount(String(outstanding));
             }
+          }
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          if (isMounted) {
+            console.warn("Could not fetch unpaid sessions:", errData?.error);
+            setSelectedSessionId(null);
+            setAmount(String(outstanding));
           }
         }
       } catch (err) {
@@ -291,7 +295,7 @@ export default function SettleDebtModal({ customer, onClose, onSettled, lang = "
                   </label>
                   {unpaidSessions.length > 1 && (
                     <span className="text-[11px] font-semibold text-[var(--cr-primary)]">
-                      {isAr ? `${unpaidSessions.length} جلسات متاحة` : `${unpaidSessions.length} sessions available`}
+                      {isAr ? `${unpaidSessions.length} عناصر متاحة` : `${unpaidSessions.length} items available`}
                     </span>
                   )}
                 </div>
@@ -340,10 +344,15 @@ export default function SettleDebtModal({ customer, onClose, onSettled, lang = "
                       >
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-1.5 min-w-0">
-                            <span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />
+                            <span className={`h-2 w-2 rounded-full shrink-0 ${session.type === 'invoice' ? 'bg-sky-500' : 'bg-amber-500'}`} />
                             <span className="font-bold text-xs text-[var(--cr-dark)] truncate">
                               {session.serviceName}
                             </span>
+                            {session.invoiceNo && session.type !== 'invoice' && (
+                              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 shrink-0">
+                                {session.invoiceNo}
+                              </span>
+                            )}
                           </div>
                           <span className="text-xs font-black text-rose-600 shrink-0">
                             {session.amountLeft.toLocaleString()} {currency}
@@ -352,10 +361,12 @@ export default function SettleDebtModal({ customer, onClose, onSettled, lang = "
 
                         <div className="flex items-center justify-between text-[11px] text-[var(--color-brand-secondary)]">
                           <div className="flex items-center gap-2">
-                            <span className="flex items-center gap-1">
-                              <Calendar size={11} className="text-gray-400" />
-                              <span>{session.date}</span>
-                            </span>
+                            {session.date && (
+                              <span className="flex items-center gap-1">
+                                <Calendar size={11} className="text-gray-400" />
+                                <span>{session.date}</span>
+                              </span>
+                            )}
                             {session.doctorName && (
                               <span className="flex items-center gap-1">
                                 <User size={11} className="text-gray-400" />
@@ -374,7 +385,23 @@ export default function SettleDebtModal({ customer, onClose, onSettled, lang = "
                   })}
                 </div>
               </div>
-            ) : null}
+            ) : (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-3.5 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs text-amber-900">
+                    {isAr ? "تسوية رصيد المديونية المباشر" : "Direct Account Balance Settlement"}
+                  </span>
+                  <span className="text-xs font-black text-rose-600">
+                    {outstanding.toLocaleString()} {currency}
+                  </span>
+                </div>
+                <p className="text-[11px] text-amber-800/80">
+                  {isAr
+                    ? "سيتم تسجيل الدفعة في السجل المالي وخصمها مباشرة من رصيد مديونية المريض."
+                    : "Payment will be recorded in the financial ledger and deducted directly from the patient's outstanding balance."}
+                </p>
+              </div>
+            )}
 
             {/* Amount input */}
             <div className="space-y-1.5">

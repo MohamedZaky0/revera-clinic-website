@@ -1,6 +1,6 @@
 # ai_docs — Revera Clinics Agent Knowledge Base
 
-> **Last Updated:** 2026-10-28 (DEC-137: Doctor Prescription Persistence, Non-UUID Safety & Real-Time Booking Details Synchronization)
+> **Last Updated:** 2026-10-29 (DEC-141: Settle Balance UI Placement, Unpaid Schema Resolution & Standalone Invoice Debt Support)
 > **Branch:** dev (these docs do not belong on main/production)
 > **Maintained by:** Project manager. Updated whenever architecture, decisions, or risks change.
 
