@@ -1,6 +1,6 @@
 # RISKS.md — Revera Clinics Risk Register
 
-> **Last Updated:** 2026-10-26 (RISK-140 added; status counts recounted from the sections). 2026-10-21 (docs audit: status index and counts rebuilt, seven entries moved to the section that matches their status; RISK-019 closed through RISK-128)
+> **Last Updated:** 2026-10-29 (RISK-142 added to the Resolved index; the totals below were not recounted and RISK-141 is still missing from the index). 2026-10-26 (RISK-140 added; status counts recounted from the sections). 2026-10-21 (docs audit: status index and counts rebuilt, seven entries moved to the section that matches their status; RISK-019 closed through RISK-128)
 > **Previous content was for a different project — discarded entirely**
 > RISK-010 … RISK-020 were found by the 2026-07-25 finance discovery audit and are the
 > remediation scope of `PROPOSALS.md` → PROPOSAL-002 Phase 0.
@@ -1279,6 +1279,7 @@ filled in with the above.
 - [RISK-140](#risk-140) — Anyone On The Internet Could Read Every Doctor's Phone, Email, National ID And Salary From The Public Doctors Endpoint (RESOLVED ON DEV, NOT YET ON PRODUCTION)
 - [RISK-143](#risk-143) — A Checkout Could Leave An Invoice Without Lines, A Payment Could Land On A Void Invoice, And Fully-Paid Manual Bookings Got No Invoice At All (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER)
 - [RISK-144](#risk-144) — A Booking Could Show, And Silently Re-Version, Another Booking's Prescription When The Same Patient Had Two Visits The Same Day (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER)
+- [RISK-142](#risk-142) — A Failed Payment Write Could Leave A Booking Marked Paid With No Payment Behind It, And Two Settlements At Once Lost One Of The Updates (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
 
 ## RISK-003: Patient Auth Is Non-Functional
 
@@ -5940,3 +5941,21 @@ See `PROPOSALS.md` for:
 **Tests:** `tests/routes/prescriptions-booking-link.test.ts`, `tests/routes/prescriptions-booking-link-local.test.ts`, `tests/lib/prescriptionBooking.test.ts`, updated case in `tests/routes/prescriptions-booking-sync.test.ts`.
 
 **Still open / residual:** older prescriptions with a null `booking_id` cannot be attributed to a visit; if the patient has two bookings on one day, both will offer that one prescription when they have none of their own (saving it from a booking links it to that booking). Nothing can fix that without guessing. Browser verification of the manual checklist is outstanding.
+
+## RISK-142: A Failed Payment Write Could Leave A Booking Marked Paid With No Payment Behind It, And Two Settlements At Once Lost One Of The Updates (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
+
+**Manual test checklist:** `ai_docs/manual_tests/SETTLE_DEBT_SAFETY_MANUAL_TESTS.md`
+
+**Severity:** High (wrong money on a booking and on a patient, silently) · **Type:** Data integrity / concurrency
+**Found:** 2026-10-29, code review of the per-session debt settlement (DEC-136, commit `23f103b`). Not seen in production data; read from the code and reproduced with failing tests.
+
+**What was wrong (`POST /api/customers/settle-debt`):**
+1. **Not atomic, wrong order.** The route wrote the booking's `amount_paid/amount_left` first, then recorded the payment (`appendPaymentToExistingInvoice` or `recordTransaction`) inside a try/catch that only logged "non-fatal", then wrote the patient's figures. If the payment row or transaction failed to write, the booking showed as paid and the invoice, the transaction history and the cash drawer had no record of it. In the multi-booking (FIFO) loop a failed update just `break`-ed while the earlier bookings stayed applied, and the response did not say so. The standalone-invoice branch inserted the payment, recorded the transaction and updated the patient with every error ignored, so the patient's balance dropped even when no payment row existed.
+2. **Lost update.** The route read `customers.outstanding` / `spent_amount` at the start, computed the new absolute values and wrote them back. Two settlements for one patient at the same moment, or any other route changing those numbers in between, lost one of the changes (reproduced: two settlements of 200 and 300 on a 500 debt left 200 outstanding instead of 0). Two settlements for the same booking at the same moment could both succeed and take the money twice.
+**Fix:** DEC-138 (no migration). Money record first, booking balance second, patient figures last as a guarded compare-and-set with re-read and retry; any failure undoes the earlier steps and says so; an undo that fails is reported with exactly what is left (`partial`, `undoFailures`, `applied`).
+
+**Still open (not guessed):**
+- Not one database transaction; a stalled write (RISK-131) can in theory leave an undo undone. The answer then says `partial: true`.
+- A failed attempt still burns one `INV-` sequence number (a gap in the numbering).
+- Settlements made before this fix may already carry a booking marked paid without a payment row. Not checked on production here. A read-only check: reservations with `amount_paid > 0` whose invoice has no `payments` rows summing to the same, compared with the `outstanding_payment` rows in `transactions`.
+- Browser verification of the Settle Balance dialog is outstanding (the response shape did not change, but a failure now reads "The payment was not applied and nothing was changed").

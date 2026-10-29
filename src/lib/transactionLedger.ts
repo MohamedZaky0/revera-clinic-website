@@ -30,23 +30,31 @@ import { formatInvoiceNo } from '@/lib/ledger';
  * e.g. next to a `payments` insert that is already guarded against re-firing. Calling it from an
  * unguarded path will duplicate financial history.
  */
-export async function recordTransaction({
-  type,
-  amount,
-  description,
-  customerId,
-  branchId,
-  invoiceId,
-  reservationId,
-  paymentMethod = 'cash',
-  status = 'completed',
-  source = 'automatic',
-  referenceNo,
-  reason,
-  createdByEmployeeId,
-  createdByName,
-  occurredAt,
-}: {
+export async function recordTransaction(input: RecordTransactionInput): Promise<void> {
+  try {
+    await writeTransactionRow(input, false);
+  } catch (err: any) {
+    if (err instanceof TransactionInsertError) {
+      console.error('recordTransaction: failed to insert transaction row (non-fatal):', err.message);
+    } else {
+      console.error('recordTransaction: unexpected failure (non-fatal):', err);
+    }
+  }
+}
+
+/**
+ * Same insert as `recordTransaction`, but the caller learns whether it worked.
+ *
+ * Returns the new row's `id` (so the caller can undo it), `null` when there was nothing to record
+ * (a zero or non-numeric amount), and THROWS when the insert fails. Use it only where the ledger row
+ * is part of an operation that must be all-or-nothing (the debt settlement, DEC-138), never for the
+ * "history must not sink the checkout" cases `recordTransaction` exists for.
+ */
+export async function recordTransactionStrict(input: RecordTransactionInput): Promise<string | null> {
+  return writeTransactionRow(input, true);
+}
+
+export interface RecordTransactionInput {
   type:
     | 'payment'
     | 'outstanding_payment'
@@ -70,43 +78,68 @@ export async function recordTransaction({
   createdByEmployeeId?: string | null;
   createdByName?: string | null;
   occurredAt?: string | null;
-}): Promise<void> {
-  try {
-    if (!amount || Number.isNaN(Number(amount))) return;
+}
 
-    const { data: seqVal, error: seqErr } = await supabaseServer.rpc('next_transaction_seq');
-    const txnId = (seqErr || seqVal == null)
-      ? `TXN-${String(Date.now()).slice(-6)}`
-      : `TXN-${String(Number(seqVal)).padStart(6, '0')}`;
-    if (seqErr || seqVal == null) {
-      console.warn('recordTransaction: next_transaction_seq failed, using fallback transaction ID:', seqErr);
-    }
+class TransactionInsertError extends Error {}
 
-    const finalReferenceNo = referenceNo?.trim() || null;
+async function writeTransactionRow(
+  {
+    type,
+    amount,
+    description,
+    customerId,
+    branchId,
+    invoiceId,
+    reservationId,
+    paymentMethod = 'cash',
+    status = 'completed',
+    source = 'automatic',
+    referenceNo,
+    reason,
+    createdByEmployeeId,
+    createdByName,
+    occurredAt,
+  }: RecordTransactionInput,
+  returnId: boolean
+): Promise<string | null> {
+  if (!amount || Number.isNaN(Number(amount))) return null;
 
-    const { error: insertErr } = await supabaseServer.from('transactions').insert({
-      transaction_id: txnId,
-      branch_id: branchId ?? null,
-      customer_id: customerId ?? null,
-      invoice_id: invoiceId ?? null,
-      reservation_id: reservationId ?? null,
-      type,
-      description,
-      payment_method: paymentMethod || 'cash',
-      amount: Number(amount),
-      status: status || 'completed',
-      source: source || 'automatic',
-      reference_no: finalReferenceNo,
-      reason: reason ?? null,
-      created_by_employee_id: createdByEmployeeId ?? null,
-      created_by_name: createdByName ?? null,
-      occurred_at: occurredAt ?? new Date().toISOString(),
-    });
-
-    if (insertErr) {
-      console.error('recordTransaction: failed to insert transaction row (non-fatal):', insertErr.message);
-    }
-  } catch (err) {
-    console.error('recordTransaction: unexpected failure (non-fatal):', err);
+  const { data: seqVal, error: seqErr } = await supabaseServer.rpc('next_transaction_seq');
+  const txnId = (seqErr || seqVal == null)
+    ? `TXN-${String(Date.now()).slice(-6)}`
+    : `TXN-${String(Number(seqVal)).padStart(6, '0')}`;
+  if (seqErr || seqVal == null) {
+    console.warn('recordTransaction: next_transaction_seq failed, using fallback transaction ID:', seqErr);
   }
+
+  const finalReferenceNo = referenceNo?.trim() || null;
+
+  const insert = supabaseServer.from('transactions').insert({
+    transaction_id: txnId,
+    branch_id: branchId ?? null,
+    customer_id: customerId ?? null,
+    invoice_id: invoiceId ?? null,
+    reservation_id: reservationId ?? null,
+    type,
+    description,
+    payment_method: paymentMethod || 'cash',
+    amount: Number(amount),
+    status: status || 'completed',
+    source: source || 'automatic',
+    reference_no: finalReferenceNo,
+    reason: reason ?? null,
+    created_by_employee_id: createdByEmployeeId ?? null,
+    created_by_name: createdByName ?? null,
+    occurred_at: occurredAt ?? new Date().toISOString(),
+  });
+
+  // The non-fatal path keeps the plain insert it always had; only the strict path asks for the id.
+  if (!returnId) {
+    const { error } = await insert;
+    if (error) throw new TransactionInsertError(error.message);
+    return null;
+  }
+  const { data: inserted, error } = await insert.select('id').single();
+  if (error) throw new TransactionInsertError(error.message);
+  return inserted?.id ?? null;
 }

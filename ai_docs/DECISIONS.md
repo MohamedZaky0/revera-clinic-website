@@ -1,6 +1,6 @@
 # DECISIONS.md — Revera Clinics Decision Log
 
-> **Last Updated:** 2026-10-21 (docs audit: duplicate DEC-025 heading renamed, migration-status lines of DEC-088/110/111/113/114/117 brought up to date; the highest number in use is DEC-122). 2026-10-26: DEC-134 added (highest number in use is now DEC-134)
+> **Last Updated:** 2026-10-29 (DEC-138 added). 2026-10-21 (docs audit: duplicate DEC-025 heading renamed, migration-status lines of DEC-088/110/111/113/114/117 brought up to date; the highest number in use is DEC-122). 2026-10-26: DEC-134 added (highest number in use is now DEC-134)
 > **Previous content was for a different project — discarded entirely**
 > **Rule:** Before changing any decision recorded here, read the full entry first.
 
@@ -4192,6 +4192,7 @@ A failure in steps 2 to 5 undoes the earlier steps (figures restored, sessions t
    - Added test case `TC-105: Doctor Prescription & Booking Details Real-Time Sync Engine` to the Admin Settings System Test Suite (`INITIAL_SYSTEM_TEST_SUITES`).
    - Added unit test suite `tests/routes/prescriptions-booking-sync.test.ts` (5 passed).
    - Verified `DoctorOngoingSessionTab.test.tsx` (13 passed).
+---
 
 
 ---
@@ -4249,3 +4250,22 @@ A failure in steps 2 to 5 undoes the earlier steps (figures restored, sessions t
 
 **Automated verification:** `tests/routes/prescriptions-booking-link.test.ts` (two bookings the same day, unlinked still found, no date, other patient/date excluded, unknown/invalid ids still save, real id attached, one lookup only for UUIDs, FK rejection and missing column fall back, version keeps link, follow-up sync only for a real booking), `tests/routes/prescriptions-booking-link-local.test.ts` (local JSON branches), `tests/lib/prescriptionBooking.test.ts`, and the updated non-UUID case in `tests/routes/prescriptions-booking-sync.test.ts`. Manual: `ai_docs/manual_tests/PRESCRIPTIONS_BOOKING_LINK_MANUAL_TESTS.md`.
 
+## DEC-138: Debt Settlement Writes The Money Record First, Undoes Everything On A Failure, And Moves The Patient's Figures With A Guarded Update
+
+**Date:** 2026-10-29 · **Status:** Done on dev (branch `fix/settle-debt-safety`); not yet on production; **no migration** · **Related:** RISK-142, DEC-136, DEC-106, DEC-133 (same ordered-steps-with-undo pattern), RISK-076
+
+**Context:** a code review of the per-session settlement (DEC-136, commit `23f103b`) found two defects in `POST /api/customers/settle-debt`: it wrote `reservations.amount_paid/amount_left` first, recorded the payment afterwards inside a try/catch that only logged ("non-fatal"), and then wrote `customers.outstanding/spent_amount` as absolute numbers computed from a read taken at the start of the request.
+
+**Decision:** the write half moved to `src/lib/debtSettlement.ts` (`applySettlement`); the route keeps validation and builds the plan from reads only. Response shape and status codes of the existing cases are unchanged (`SettleDebtModal` keeps working).
+1. **Order (per allocation): money record first, booking second.** (a) the `payments` row, when the booking has an invoice (newest invoice of the booking, the same lookup `appendPaymentToExistingInvoice` uses) or when the target is a standalone invoice; (b) the `transactions` row (`outstanding_payment`) through the new `recordTransactionStrict` (`src/lib/transactionLedger.ts`), which returns the row id and throws on failure, unlike `recordTransaction`, which stays non-fatal for every other caller; (c) the booking balance, written only if the booking still holds the `amount_paid`/`amount_left` that were read (compare-and-set). A booking can no longer show as paid without a payment row and transaction behind it. If the process dies between (b) and (c), the books show a payment the booking does not, which matches the cash actually taken and is visible.
+2. **All or nothing.** The FIFO loop no longer `break`s on a failed update with the earlier bookings left applied. Any failure in any allocation, or in the final step, undoes every earlier write (booking restored with a guarded update, transaction and payment rows deleted by id) and answers "The payment was not applied and nothing was changed" (500, or 409 for the two conflict cases). If an undo step itself fails the answer carries `partial: true`, `undoFailures` and `applied` (each allocation still in place with `leftover`: `booking balance`, `payment row` or `transaction row`). When a booking's balance cannot be restored its payment and transaction are deliberately kept, so the booking and the ledger still agree.
+3. **Patient figures (`outstanding`, `spent_amount`) are the commit point and are race-safe.** The update is a compare-and-set (`.eq('outstanding', previous)` and `.eq('spent_amount', previous)`, null-safe via `eqOrNull`). If it matches no row, the figures are re-read and the same delta (`outstanding - settled`, floored at 0; `spent + settled`) is applied to the fresh values, up to 5 attempts; after that `409 PATIENT_FIGURES_CHANGED` and everything is undone. Two settlements for one patient at the same moment therefore both count. The same style of guard `hardDeleteBooking` uses (DEC-133).
+4. **Two settlements racing for the same booking:** the second one's guarded booking update matches nothing, it undoes its own payment and answers `409 BOOKING_CHANGED`; the money is not taken twice.
+5. **FIFO planning reads everything before writing.** A booking's own invoice is counted once: the invoice pass subtracts what the plan already puts on each invoice (before, the invoice pass re-read payments after the booking loop had written them).
+6. The errors that used to be swallowed are now real: the standalone-invoice branch ignored the payment insert error and the patient update error; both are failures now.
+
+**Why a guarded update and not a Postgres function:** a function (`outstanding = outstanding - x, spent_amount = spent_amount + x`) would make step 3 one statement, but it needs a migration that could not be applied or tested from here, and the guarded update gives the same result. If settlement volume ever makes 5 attempts too few, the function is the next step.
+
+**Known limits (not changed):** still not one database transaction (a stalled write, RISK-131, can leave an undo undone; the answer says so). The sequence number drawn for the receipt reference (`next_invoice_no`) is not given back on a failure, so a failed attempt leaves a gap in the INV numbers. `findReservationInvoice` repeats the invoice lookup of `appendPaymentToExistingInvoice` (reservations route); if that lookup changes, change both.
+
+**Tests:** `tests/routes/settle-debt-safety.test.ts` (18 cases; 15 failed against the old route) with the fault/race helper `tests/helpers/supabaseFaults.ts`; `tests/routes/settle-debt.test.ts` unchanged and passing. Manual checklist: `ai_docs/manual_tests/SETTLE_DEBT_SAFETY_MANUAL_TESTS.md`.
