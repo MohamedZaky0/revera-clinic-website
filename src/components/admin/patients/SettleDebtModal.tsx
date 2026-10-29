@@ -437,9 +437,9 @@ export default function SettleDebtModal({ customer, onClose, onSettled, lang = "
                   }}
                   placeholder="0"
                   autoFocus
-                  className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)] focus:ring-1 focus:ring-[var(--cr-primary)] transition"
+                  className="w-full rounded-xl border border-gray-200 bg-white ps-3.5 pe-12 py-2.5 text-sm font-semibold text-[var(--cr-dark)] outline-none focus:border-[var(--cr-primary)] focus:ring-1 focus:ring-[var(--cr-primary)] transition [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
-                <span className="absolute end-3.5 top-2.5 text-xs font-bold text-gray-400">
+                <span className="absolute end-3.5 top-2.5 text-xs font-bold text-gray-400 pointer-events-none select-none">
                   {currency}
                 </span>
               </div>
