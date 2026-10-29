@@ -32,6 +32,72 @@ function writeLocalPrescriptions(data: any[]) {
   }
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * DEC-140: which booking id may be written to `prescriptions.booking_id` (a UUID foreign key to
+ * `reservations`). Only an id that is a UUID AND exists in `reservations` qualifies; anything else
+ * (junk, 'undefined', a legacy local id like '1780826201251-408', a deleted booking) yields null so
+ * the prescription is saved unlinked instead of failing or being rejected by the foreign key.
+ * One cheap lookup, and none at all for ids that cannot be UUIDs (avoids a Postgres 22P02).
+ * If the lookup itself errors (we cannot tell), the id is kept and the insert's own foreign-key
+ * retry (insertPrescriptionRow) stays as the safety net.
+ */
+async function resolveExistingBookingId(raw: string | null): Promise<string | null> {
+  if (!raw || !UUID_RE.test(raw)) return null;
+  try {
+    const { data, error } = await supabaseServer
+      .from('reservations')
+      .select('id')
+      .eq('id', raw)
+      .maybeSingle();
+    if (error) return raw;
+    return data?.id ? String(data.id) : null;
+  } catch (_) {
+    return raw;
+  }
+}
+
+/** Insert one prescription row; retries once without a column an older database does not know, or a booking the FK rejects. */
+async function insertPrescriptionRow(payload: Record<string, any>) {
+  const run = () => supabaseServer.from('prescriptions').insert(payload).select().single();
+  let { data, error } = await run();
+  if (error && (
+    error.code === '23503' ||
+    error.code === '22P02' ||
+    error.code === 'PGRST204' ||
+    error.code === '42703' ||
+    error.message?.includes('booking_id') ||
+    error.message?.includes('follow_up_notes') ||
+    error.message?.includes('foreign key constraint') ||
+    error.message?.includes('prescriptions_booking_id_fkey') ||
+    error.message?.includes('invalid input syntax for type uuid')
+  )) {
+    if (error.message?.includes('booking_id') || error.code === '23503' || error.code === '22P02' || error.message?.includes('invalid input syntax for type uuid')) delete payload.booking_id;
+    if (error.message?.includes('follow_up_notes') || error.code === '42703' || error.code === 'PGRST204') delete payload.follow_up_notes;
+    const retry = await run();
+    data = retry.data;
+    error = retry.error;
+  }
+  return { data, error };
+}
+
+/**
+ * DEC-140: local JSON equivalent of the booking lookup. A booking sees the prescriptions linked to
+ * it; when it has none, it may fall back to the same patient's prescriptions that were saved WITHOUT
+ * a booking_id (same date when given) -- never another booking's prescription.
+ */
+function filterLocalByBooking(local: any[], bookingId: string, customerId: string | null, bookingDate: string | null): any[] {
+  const direct = local.filter((p: any) => String(p.booking_id) === String(bookingId));
+  if (direct.length > 0) return direct;
+  if (!customerId || customerId === 'all') return [];
+  return local.filter((p: any) =>
+    String(p.customer_id) === String(customerId) &&
+    !p.booking_id &&
+    (!bookingDate || p.date === bookingDate)
+  );
+}
+
 export async function GET(req: Request) {
   const access = await requireStaffAccess(req);
   if ('error' in access) {
@@ -74,13 +140,16 @@ export async function GET(req: Request) {
 
       let { data, error } = await query;
 
-      // Fallback: If querying by bookingId returned nothing, but customerId is provided,
-      // search by customerId as fallback so prescriptions saved without booking_id are still surfaced.
+      // Fallback (DEC-140): the booking has no prescription of its own. Surface only the same
+      // patient's prescriptions saved WITHOUT a booking (booking_id IS NULL) -- never one that
+      // belongs to another booking, or two bookings of one patient on the same day would show each
+      // other's clinical record.
       if (!error && bookingId && bookingId !== 'all' && (!data || data.length === 0) && customerId && customerId !== 'all') {
         let fallbackCustomerQuery = supabaseServer
           .from('prescriptions')
           .select('*')
-          .eq('customer_id', customerId);
+          .eq('customer_id', customerId)
+          .is('booking_id', null);
         if (!allVersions) {
           fallbackCustomerQuery = fallbackCustomerQuery.or('is_latest.eq.true,is_latest.is.null');
         }
@@ -123,18 +192,7 @@ export async function GET(req: Request) {
               local = local.filter((p: any) => p.is_latest !== false);
             }
             if (bookingId && bookingId !== 'all') {
-              const direct = local.filter((p: any) => String(p.booking_id) === String(bookingId));
-              if (direct.length > 0) {
-                local = direct;
-              } else if (customerId && customerId !== 'all') {
-                local = local.filter((p: any) => {
-                  const matchCust = String(p.customer_id) === String(customerId);
-                  const matchDate = !bookingDate || p.date === bookingDate;
-                  return matchCust && matchDate;
-                });
-              } else {
-                local = [];
-              }
+              local = filterLocalByBooking(local, bookingId, customerId, bookingDate);
             } else if (customerId && customerId !== 'all') {
               local = local.filter((p: any) => String(p.customer_id) === String(customerId));
             } else if (patientName) {
@@ -159,18 +217,7 @@ export async function GET(req: Request) {
             local = local.filter((p: any) => p.is_latest !== false);
           }
           if (bookingId && bookingId !== 'all') {
-            const direct = local.filter((p: any) => String(p.booking_id) === String(bookingId));
-            if (direct.length > 0) {
-              local = direct;
-            } else if (customerId && customerId !== 'all') {
-              local = local.filter((p: any) => {
-                const matchCust = String(p.customer_id) === String(customerId);
-                const matchDate = !bookingDate || p.date === bookingDate;
-                return matchCust && matchDate;
-              });
-            } else {
-              local = [];
-            }
+            local = filterLocalByBooking(local, bookingId, customerId, bookingDate);
           } else if (customerId && customerId !== 'all') {
             local = local.filter((p: any) => String(p.customer_id) === String(customerId));
           } else if (patientName) {
@@ -205,7 +252,6 @@ export async function POST(req: Request) {
   const customerId = body.customer_id || body.customerId;
   const rawBookingId = body.booking_id || body.bookingId;
   const cleanBookingId = (rawBookingId && rawBookingId !== 'undefined' && rawBookingId !== 'null') ? String(rawBookingId).trim() : null;
-  const isBookingIdUuid = Boolean(cleanBookingId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanBookingId));
   const patientName = body.patient_name || body.customer_name;
   const diagnosis = body.diagnosis;
   const medications = body.medications;
@@ -219,8 +265,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'patient_name or customer_id is required' }, { status: 400 });
   }
 
+  // DEC-140: link to the booking only when that reservation really exists (see resolveExistingBookingId).
+  // A junk / unknown / deleted id never fails the save and never silently drops the prescription:
+  // it is stored unlinked (booking_id null). The local JSON fallback below keeps the raw id because
+  // it has no foreign key and legacy local bookings use non-UUID ids.
+  const linkedBookingId = await resolveExistingBookingId(cleanBookingId);
+
   const basePrescriptionData: Record<string, any> = {
-    booking_id: cleanBookingId || null,
+    booking_id: linkedBookingId,
     customer_id: customerId || null,
     patient_name: patientName,
     date: body.date || new Date().toISOString().slice(0, 10),
@@ -285,37 +337,7 @@ export async function POST(req: Request) {
           updated_at: new Date().toISOString()
         };
 
-        if (newVersionData.booking_id && !isBookingIdUuid) {
-          delete newVersionData.booking_id;
-        }
-
-        let { data, error } = await supabaseServer
-          .from('prescriptions')
-          .insert(newVersionData)
-          .select()
-          .single();
-
-        if (error && (
-          error.code === '23503' ||
-          error.code === '22P02' ||
-          error.code === 'PGRST204' ||
-          error.code === '42703' ||
-          error.message?.includes('booking_id') ||
-          error.message?.includes('follow_up_notes') ||
-          error.message?.includes('foreign key constraint') ||
-          error.message?.includes('prescriptions_booking_id_fkey') ||
-          error.message?.includes('invalid input syntax for type uuid')
-        )) {
-          if (error.message?.includes('booking_id') || error.code === '23503' || error.code === '22P02' || error.message?.includes('invalid input syntax for type uuid')) delete newVersionData.booking_id;
-          if (error.message?.includes('follow_up_notes') || error.code === '42703' || error.code === 'PGRST204') delete newVersionData.follow_up_notes;
-          const retry = await supabaseServer
-            .from('prescriptions')
-            .insert(newVersionData)
-            .select()
-            .single();
-          data = retry.data;
-          error = retry.error;
-        }
+        const { data, error } = await insertPrescriptionRow(newVersionData);
 
         if (error) {
           if (error.code === 'PGRST205') throw error; // trigger local fallback
@@ -332,37 +354,7 @@ export async function POST(req: Request) {
           updated_at: new Date().toISOString()
         };
 
-        if (newPrescriptionPayload.booking_id && !isBookingIdUuid) {
-          delete newPrescriptionPayload.booking_id;
-        }
-
-        let { data, error } = await supabaseServer
-          .from('prescriptions')
-          .insert(newPrescriptionPayload)
-          .select()
-          .single();
-
-        if (error && (
-          error.code === '23503' ||
-          error.code === '22P02' ||
-          error.code === 'PGRST204' ||
-          error.code === '42703' ||
-          error.message?.includes('booking_id') ||
-          error.message?.includes('follow_up_notes') ||
-          error.message?.includes('foreign key constraint') ||
-          error.message?.includes('prescriptions_booking_id_fkey') ||
-          error.message?.includes('invalid input syntax for type uuid')
-        )) {
-          if (error.message?.includes('booking_id') || error.code === '23503' || error.code === '22P02' || error.message?.includes('invalid input syntax for type uuid')) delete newPrescriptionPayload.booking_id;
-          if (error.message?.includes('follow_up_notes') || error.code === '42703' || error.code === 'PGRST204') delete newPrescriptionPayload.follow_up_notes;
-          const retry = await supabaseServer
-            .from('prescriptions')
-            .insert(newPrescriptionPayload)
-            .select()
-            .single();
-          data = retry.data;
-          error = retry.error;
-        }
+        const { data, error } = await insertPrescriptionRow(newPrescriptionPayload);
 
         if (error) {
           if (error.code === 'PGRST205') throw error; // trigger local fallback
@@ -383,17 +375,18 @@ export async function POST(req: Request) {
         result = data;
       }
 
-      if (result && cleanBookingId && !result.booking_id) {
-        result.booking_id = cleanBookingId;
+      // Report what is actually stored: the link exists only if the row kept a booking_id.
+      if (result && result.booking_id === undefined) {
+        result.booking_id = null;
       }
 
-      // Automatically sync follow_up_date to the corresponding reservation record
-      if (cleanBookingId && followUpDate && isBookingIdUuid) {
+      // Automatically sync follow_up_date to the reservation this prescription is really linked to
+      if (result?.booking_id && followUpDate) {
         try {
           await supabaseServer
             .from('reservations')
             .update({ follow_up_date: followUpDate })
-            .eq('id', cleanBookingId);
+            .eq('id', result.booking_id);
         } catch (_) {}
       }
 
@@ -440,6 +433,7 @@ export async function POST(req: Request) {
           result = {
             id: newId,
             ...basePrescriptionData,
+            booking_id: cleanBookingId || null, // local JSON has no foreign key: keep the raw id
             version: 1,
             is_latest: true,
             root_prescription_id: newId,

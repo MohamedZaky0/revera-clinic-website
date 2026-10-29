@@ -25,6 +25,7 @@ import { getAuthHeaders } from "../utils";
 import { MedicalRecordTemplate, IntakeField } from "@/app/api/medical-records/templates/route";
 import { checkIsLaserService } from "@/components/admin/bookings/BookingDetailsModal";
 import { computePackageDeficit, resolveDeliveredPulses, extractPulsePackageQuota } from "@/lib/laserDeficit";
+import { pickPrescriptionForBooking } from "@/lib/prescriptionBooking";
 
 export interface AdditionalServiceItem {
   id: string | number;
@@ -306,8 +307,8 @@ export default function DoctorOngoingSessionTab({
         const res = await fetch(`/api/prescriptions?${params.toString()}`, { headers });
         if (res.ok) {
           const data = await res.json();
-          const rxList = Array.isArray(data) ? data : data.prescriptions || [];
-          const existing = rxList.find((rx: any) => String(rx.booking_id) === String(bookingId)) || (rxList.length > 0 ? rxList[0] : null);
+          // DEC-140: only this booking's own prescription, or one saved without any booking.
+          const existing = pickPrescriptionForBooking<any>(Array.isArray(data) ? data : data.prescriptions || [], bookingId);
           if (existing) {
             setExistingRxId(existing.id);
             setRxDiagnosis(existing.diagnosis || "");

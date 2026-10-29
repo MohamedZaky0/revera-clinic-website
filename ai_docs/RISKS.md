@@ -1277,6 +1277,7 @@ filled in with the above.
 - [RISK-138](#risk-138) — A Patient With Bookings Could Not Be Deleted For Good; The Owner's Rule Is That Permanent Delete Removes Everything (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
 - [RISK-139](#risk-139) — Permanently Deleting A Booking Left Its Payments And Money In The Patient's Figures (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER OR ON PRODUCTION)
 - [RISK-140](#risk-140) — Anyone On The Internet Could Read Every Doctor's Phone, Email, National ID And Salary From The Public Doctors Endpoint (RESOLVED ON DEV, NOT YET ON PRODUCTION)
+- [RISK-144](#risk-144) — A Booking Could Show, And Silently Re-Version, Another Booking's Prescription When The Same Patient Had Two Visits The Same Day (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER)
 
 ## RISK-003: Patient Auth Is Non-Functional
 
@@ -5921,3 +5922,20 @@ See `PROPOSALS.md` for:
 - Invoice numbers burned by the former failing `'paid'` inserts stay skipped; there is no back-fill.
 - An overpayment still produces a `payments` row larger than the invoice total (wallet credit is a separate instruction) - unchanged, pre-existing.
 - A payment insert that fails after a reference was drawn can still skip one invoice number (sequences cannot be rolled back).
+
+## RISK-144: A Booking Could Show, And Silently Re-Version, Another Booking's Prescription When The Same Patient Had Two Visits The Same Day (RESOLVED ON DEV, NOT YET CONFIRMED IN THE BROWSER)
+
+**Manual test checklist:** `ai_docs/manual_tests/PRESCRIPTIONS_BOOKING_LINK_MANUAL_TESTS.md`
+
+**Severity:** High (clinical record mix-up) · **Type:** Data integrity / patient safety
+**Found:** 2026-10-29, review of DEC-137 (commit `cbf8c28`). Decision: DEC-140.
+
+**Causes found:**
+1. `GET /api/prescriptions?bookingId=&customerId=&date=` fell back, when the booking had no prescription, to every prescription of that patient on that date (or all of the patient's latest prescriptions with no date), including ones linked to a different booking. The Booking Details modal and the doctor session tab then pre-filled the diagnosis and medications from it and, on save, created a new version of the other booking's prescription (`id: existingRxId`). Same in the two local JSON branches.
+2. `POST /api/prescriptions` took `booking_id` from the request body without checking the reservation, relied on the foreign key, and echoed the requested id back in the response even when the row was stored without it.
+
+**Fix:** (see DEC-140) the fallback returns only the patient's prescriptions with `booking_id IS NULL` (same date when given), in the database path and both local JSON branches; `booking_id` is written only when the reservation exists (one lookup, none for non-UUID ids), otherwise the prescription is saved unlinked and the response says `booking_id: null`; the foreign-key / missing-column retry is kept; the two screens filter the list to this booking's own or unlinked prescriptions. No migration, no schema change.
+
+**Tests:** `tests/routes/prescriptions-booking-link.test.ts`, `tests/routes/prescriptions-booking-link-local.test.ts`, `tests/lib/prescriptionBooking.test.ts`, updated case in `tests/routes/prescriptions-booking-sync.test.ts`.
+
+**Still open / residual:** older prescriptions with a null `booking_id` cannot be attributed to a visit; if the patient has two bookings on one day, both will offer that one prescription when they have none of their own (saving it from a booking links it to that booking). Nothing can fix that without guessing. Browser verification of the manual checklist is outstanding.

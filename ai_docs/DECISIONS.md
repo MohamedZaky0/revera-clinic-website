@@ -4224,3 +4224,28 @@ A failure in steps 2 to 5 undoes the earlier steps (figures restored, sessions t
 **Tests:** `tests/routes/checkout-invoice-safety.test.ts` (21): old lines survive an insert failure and a delete failure, void/draft invoices are never chosen or paid, fallback to a standalone transaction, RPC error and RPC throw degrade with distinct references, valid invoice status for paid/unpaid/overpaid manual bookings and the auto-created invoice, line-less invoice cleanup. Full suite and `tsc --noEmit` clean.
 
 ---
+
+**Amended by DEC-140 (2026-10-29):** two parts of this decision were wrong in a way that could attach a prescription to the wrong visit. (a) `booking_id` is no longer copied from the request body; it is written only when the reservation exists, and the response reports what was really stored. (b) The `customerId` + `date` fallback in `GET /api/prescriptions` now returns only prescriptions with `booking_id IS NULL`, never another booking's. The real-time sync, pre-fill, versioning and auto-save parts of this decision stand unchanged.
+
+---
+
+## DEC-140: A Prescription Is Linked To A Booking Only When That Booking Exists, And The Per-Booking Fallback Never Returns Another Booking's Prescription
+
+**Date:** 2026-10-29
+**Status:** Decided & implemented (review of DEC-137 / commit `cbf8c28`). Risk: RISK-144. No migration.
+
+**Context:** Review of DEC-137 found two defects.
+1. `POST /api/prescriptions` used to attach `booking_id` only after checking that the reservation exists. DEC-137 removed that check and set `booking_id` straight from the request body (trimmed and UUID-shape checked), relying on the foreign key to reject unknown ids and on a retry. It also copied the requested id into the response even when the database row did not keep it, so the caller was told the prescription was linked when it was not.
+2. `GET /api/prescriptions?bookingId=&customerId=&date=`: when the booking had no prescription of its own, the fallback returned every prescription of that patient for that date (or all of the patient's latest prescriptions with no date). A patient with two bookings on the same day saw booking A's prescription inside booking B. In a clinical record, that is a mix-up, and the Booking Details and doctor session screens then pre-fill the form from it and, on save, create a new version of A's prescription (`id: existingRxId`).
+
+**Decision:**
+1. **POST.** `booking_id` is written only if the id is a UUID **and** one `reservations` lookup finds it (`resolveExistingBookingId`). Non-UUID ids never reach Postgres (no 22P02 round trip). Anything else (junk, `'undefined'`, a deleted or unknown booking) is saved **unlinked** (`booking_id` null): the save never fails and the prescription is never dropped. If the lookup itself errors, the id is kept and the insert's own retry stays as the net. The retry (now one helper, `insertPrescriptionRow`) still strips `booking_id` on a foreign-key/uuid rejection and when the column does not exist in an older database, and `follow_up_notes` when that column is missing. The response reports the stored value (`booking_id: null` when unlinked). The `reservations.follow_up_date` sync uses the booking the row is really linked to. A new version of an existing prescription keeps the original link when the request's id does not verify.
+2. **GET fallback.** Only when the booking has no prescription of its own: same `customer_id`, **`booking_id IS NULL`**, same `date` when given, latest versions unless `all_versions`. The same rule is applied in both in-memory (local JSON) branches via one helper, `filterLocalByBooking`. The local JSON store keeps the raw booking id on create (no foreign key there; legacy local bookings use non-UUID ids).
+3. **Callers.** `BookingDetailsModal.tsx` and `DoctorOngoingSessionTab.tsx` no longer take `rxList[0]` blindly: `src/lib/prescriptionBooking.ts` (`prescriptionsForBooking`, `pickPrescriptionForBooking`) keeps only this booking's own prescriptions or unlinked ones and prefers the booking's own. DEC-137's intent holds: a prescription written in a session is posted with that session's reservation id, so it is linked and appears in Booking Details at once; the null-booking fallback only serves older prescriptions saved before the link was reliable.
+
+**Alternatives rejected:** keeping the date fallback and trusting callers to filter (the API is the clinical boundary; a client filter is only a second net); requiring `date` for the fallback (the brief allows it without a date; callers always send it); adding a migration to backfill `booking_id` on old rows (cannot be done safely: it would be the same date-guess that caused the mix-up).
+
+**Known residual:** older prescriptions with `booking_id` null are still ambiguous when the same patient has two bookings on the same day; both bookings will offer that one prescription (it is shown only when the booking has none of its own, and saving it from a booking links it to that booking). Prescriptions saved from now on are linked.
+
+**Automated verification:** `tests/routes/prescriptions-booking-link.test.ts` (two bookings the same day, unlinked still found, no date, other patient/date excluded, unknown/invalid ids still save, real id attached, one lookup only for UUIDs, FK rejection and missing column fall back, version keeps link, follow-up sync only for a real booking), `tests/routes/prescriptions-booking-link-local.test.ts` (local JSON branches), `tests/lib/prescriptionBooking.test.ts`, and the updated non-UUID case in `tests/routes/prescriptions-booking-sync.test.ts`. Manual: `ai_docs/manual_tests/PRESCRIPTIONS_BOOKING_LINK_MANUAL_TESTS.md`.
+
