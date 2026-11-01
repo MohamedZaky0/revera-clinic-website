@@ -4330,3 +4330,25 @@ Previously, in the reception checkout modal (`src/app/admin/page.tsx`), the Amou
    - Added automated test in `tests/routes/checkout-invoice-safety.test.ts` verifying that checkout with 0 amount paid retains `amount_left: netDue`, inserts 0 payments rows, updates customer outstanding debt, and preserves unpaid status.
    - Verified with `npx vitest run tests/routes/checkout-invoice-safety.test.ts` (all 22 tests passing).
    - Verified `npm run typecheck` and `npm run build` (all 45 pages compiled cleanly with 0 errors).
+
+---
+
+## DEC-143: Previous Booking Transaction Reference Alignment (INV-NNNNNN)
+
+**Date:** 2026-11-01 · **Status:** Done on dev; **no migration** · **Related:** DEC-086, DEC-103, RISK-076, RISK-102
+
+**Context:**
+When reception created a historical booking (`POST /api/reservations/previous`), the `recordTransaction` call was invoked in Step 8 before the invoice was written in Step 9. As a result, no `referenceNo` or `invoiceId` was passed to `recordTransaction`, leaving `reference_no` as `null` in the `transactions` table. In the Transactions view (`TransactionsView.tsx`), transactions without a reference defaulted to showing the raw reservation UUID (`reservation_id`), rather than the standardized invoice reference `INV-NNNNNN`. Additionally, `payments.reference` was written with the hardcoded string `'historical backfill'` rather than the invoice number.
+
+**Decision & Implementation:**
+1. **Invoice-First Flow in Historical Booking POST**:
+   - Reordered steps in `src/app/api/reservations/previous/route.ts` so `writeHistoricalBookingInvoice` is called first.
+   - Passed `invoiceId: ledger.invoiceId` and `referenceNo: ledger.invoiceNo` to `recordTransaction` upon creating the payment transaction.
+2. **Standardized Payment Reference in Ledger**:
+   - In `src/lib/historicalInvoice.ts`, updated `payments.insert` to store `reference: invoiceNo` (`INV-NNNNNN`) instead of `'historical backfill'`.
+3. **Historical Booking PATCH Transaction Reference Preservation**:
+   - Updated invoice retrieval in `PATCH /api/reservations/previous` to select `invoice_no` alongside `id, grand_total`.
+   - Propagated `reference_no: existingInv.invoice_no` and `invoice_id: existingInv.id` when updating or inserting transaction records during historical booking edits.
+4. **Automated Verification**:
+   - Updated `tests/routes/reservations-previous-invoice.test.ts` to assert that `transactions[0].reference_no === 'INV-000100'`, `transactions[0].invoice_id === inv.id`, and `payments[0].reference === 'INV-000100'`.
+   - Verified that all 17 tests in `tests/routes/reservations-previous-invoice.test.ts` pass cleanly.

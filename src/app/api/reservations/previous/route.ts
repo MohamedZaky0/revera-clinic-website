@@ -576,36 +576,9 @@ export async function POST(req: Request) {
       }
     }
 
-    // 8. Record Financial Transaction (RISK-076) in `transactions` table
-    if (parsedPaid > 0 && customerId) {
-      const descItems: string[] = [];
-      if (resolvedServiceNames.length > 0) descItems.push(`Services: ${resolvedServiceNames.join(', ')}`);
-      if (resolvedPackageName) descItems.push(`Package: ${resolvedPackageName}`);
-      if (resolvedProductNames.length > 0) {
-        descItems.push(`${resolvedProductNames.length > 1 ? 'Products' : 'Product'}: ${resolvedProductNames.join(', ')}`);
-      }
-      const itemsDesc = descItems.length > 0 ? ` (${descItems.join(', ')})` : '';
-
-      await recordTransaction({
-        type: 'payment',
-        amount: parsedPaid,
-        description: `Payment for historical booking on ${rawDate.slice(0, 10)}${itemsDesc}`,
-        customerId: customerId,
-        branchId: branchId || null,
-        reservationId: newReservation.id,
-        paymentMethod: mapTransactionPaymentMethod(paymentType),
-        status: 'completed',
-        source: 'manual',
-        reason: notes || 'Historical booking payment',
-        createdByEmployeeId: staffEmployeeId,
-        createdByName: staffEmployeeName,
-        occurredAt: `${rawDate.slice(0, 10)}T12:00:00Z`
-      });
-    }
-
-    // 9. Ledger invoice + payment for the historical booking (DEC-086 / RISK-102). Non-fatal — the
-    //    booking, balances and transactions row above are already saved — but a failure is reported in
-    //    the response (`ledger.status = 'failed'`) instead of being swallowed; the idempotent
+    // 8. Ledger invoice + payment for the historical booking (DEC-086 / RISK-102). Non-fatal — the
+    //    booking and balances are already saved — but a failure is reported in the response
+    //    (`ledger.status = 'failed'`) instead of being swallowed; the idempotent
     //    scripts/backfill_historical_invoices.sql repairs any that slip through.
     let ledger: Awaited<ReturnType<typeof writeHistoricalBookingInvoice>> = { status: 'skipped', reason: 'zero_total' };
     if (customerId && newReservation?.id) {
@@ -626,6 +599,38 @@ export async function POST(req: Request) {
       if (ledger.status === 'failed') {
         console.error('Failed to write ledger invoice for historical booking (non-fatal):', ledger.error);
       }
+    }
+
+    // 9. Record Financial Transaction (RISK-076) in `transactions` table with authoritative invoice reference
+    if (parsedPaid > 0 && customerId) {
+      const descItems: string[] = [];
+      if (resolvedServiceNames.length > 0) descItems.push(`Services: ${resolvedServiceNames.join(', ')}`);
+      if (resolvedPackageName) descItems.push(`Package: ${resolvedPackageName}`);
+      if (resolvedProductNames.length > 0) {
+        descItems.push(`${resolvedProductNames.length > 1 ? 'Products' : 'Product'}: ${resolvedProductNames.join(', ')}`);
+      }
+      const itemsDesc = descItems.length > 0 ? ` (${descItems.join(', ')})` : '';
+
+      const invoiceRef = ledger.status === 'created' ? ledger.invoiceNo : null;
+      const invoiceId = ledger.status === 'created' ? ledger.invoiceId : null;
+
+      await recordTransaction({
+        type: 'payment',
+        amount: parsedPaid,
+        description: `Payment for historical booking on ${rawDate.slice(0, 10)}${itemsDesc}`,
+        customerId: customerId,
+        branchId: branchId || null,
+        invoiceId: invoiceId,
+        referenceNo: invoiceRef,
+        reservationId: newReservation.id,
+        paymentMethod: mapTransactionPaymentMethod(paymentType),
+        status: 'completed',
+        source: 'manual',
+        reason: notes || 'Historical booking payment',
+        createdByEmployeeId: staffEmployeeId,
+        createdByName: staffEmployeeName,
+        occurredAt: `${rawDate.slice(0, 10)}T12:00:00Z`
+      });
     }
 
     return NextResponse.json({
@@ -746,7 +751,7 @@ export async function PATCH(req: Request) {
 
     const { data: invRows, error: invError } = await supabaseServer
       .from('invoices')
-      .select('id, grand_total')
+      .select('id, grand_total, invoice_no')
       .eq('reservation_id', id)
       .order('issued_at', { ascending: true })
       .limit(1);
@@ -760,7 +765,7 @@ export async function PATCH(req: Request) {
         { status: 500 }
       );
     }
-    const existingInv: { id: string; grand_total: number } | null = (invRows && invRows[0]) || null;
+    const existingInv: { id: string; grand_total: number; invoice_no?: string } | null = (invRows && invRows[0]) || null;
 
     if (existingInv) {
       oldInvoiceValue = Number(existingInv.grand_total || 0);
@@ -1190,7 +1195,8 @@ export async function PATCH(req: Request) {
             .update({
               amount: parsedPaid,
               payment_method: mapTransactionPaymentMethod(paymentType),
-              occurred_at: `${rawDate.slice(0, 10)}T12:00:00Z`
+              occurred_at: `${rawDate.slice(0, 10)}T12:00:00Z`,
+              ...(existingInv?.invoice_no ? { reference_no: existingInv.invoice_no, invoice_id: existingInv.id } : {})
             })
             .eq('id', existingTxn.id);
 
@@ -1231,6 +1237,8 @@ export async function PATCH(req: Request) {
           description: `Payment for historical booking on ${rawDate.slice(0, 10)}${itemsDesc}`,
           customerId: existing.customer_id,
           branchId: branchId || existing.branch_id || null,
+          invoiceId: existingInv?.id || null,
+          referenceNo: existingInv?.invoice_no || null,
           reservationId: id,
           paymentMethod: mapTransactionPaymentMethod(paymentType),
           status: 'completed',

@@ -116,7 +116,7 @@ export async function writeHistoricalBookingInvoice(input: HistoricalInvoiceInpu
         amount: input.amountPaid,
         method: mapPaymentMethod(input.paymentType),
         received_by_employee_id: input.employeeId,
-        reference: 'historical backfill',
+        reference: invoiceNo,
         is_opening: true,
       });
       if (payErr) throw payErr;

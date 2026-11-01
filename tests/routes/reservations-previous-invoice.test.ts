@@ -76,10 +76,13 @@ describe('historical booking writes its ledger invoice', () => {
     expect(rows('invoice_lines')[0].description).toBe('Laser Face [historical backfill]');
 
     expect(rows('payments')).toHaveLength(1);
-    expect(rows('payments')[0]).toMatchObject({ amount: 1200, method: 'card', is_opening: true, received_by_employee_id: EMP_ID });
+    expect(rows('payments')[0]).toMatchObject({ amount: 1200, method: 'card', is_opening: true, received_by_employee_id: EMP_ID, reference: 'INV-000100' });
 
     // The cash side is already recorded in `transactions` by the route — exactly one, not two.
-    expect(rows('transactions').filter((t) => t.type === 'payment')).toHaveLength(1);
+    const txns = rows('transactions').filter((t) => t.type === 'payment');
+    expect(txns).toHaveLength(1);
+    expect(txns[0].reference_no).toBe('INV-000100');
+    expect(txns[0].invoice_id).toBe(inv.id);
   });
 
   it('part-paid package: invoice is the full value, payment the paid part; ledger outstanding equals the customer scalar', async () => {
