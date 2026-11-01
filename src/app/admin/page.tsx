@@ -2954,7 +2954,8 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
     { id: 'TC-102', name: 'Booking Creation & Checkout Financial Ledger Dual-Write Engine', category: 'Finance & Accounting', endpoint: '/api/reservations', description: 'Verifies service catalog cat schema query, automatic booking payment ledger recording, debt settlement transactions, and cash till reconciliation.', status: 'idle' },
     { id: 'TC-103', name: 'Unique Payment Sequence Numbering & Manual Booking Invoice Generation', category: 'Finance & Accounting', endpoint: '/api/invoices?action=next_no', description: 'Verifies sequential atomic invoice/payment reference generation (INV-XXXXXX), preventing duplicated reference numbers across payments and debt settlements, and guaranteeing standard invoice creation for manual bookings.', status: 'idle' },
     { id: 'TC-104', name: 'Payment Status Calculation & Multi-Session Debt Settlement Engine', category: 'Finance & Accounting', endpoint: '/api/customers/settle-debt', description: 'Verifies strict payment status calculation (Unpaid when 0 EGP paid, Partially Paid strictly when >= 1 EGP paid with remaining balance), zero-debt settlement gating, per-session itemized unpaid breakdown, and targeted session balance settlement.', status: 'idle' },
-    { id: 'TC-105', name: 'Doctor Prescription & Booking Details Real-Time Sync Engine', category: 'Medical & Patients', endpoint: '/api/prescriptions', description: 'Verifies real-time synchronization of doctor-written digital prescriptions with Booking Details, non-UUID booking ID safety, customer fallback querying, and end-session prefilling.', status: 'idle' }
+    { id: 'TC-105', name: 'Doctor Prescription & Booking Details Real-Time Sync Engine', category: 'Medical & Patients', endpoint: '/api/prescriptions', description: 'Verifies real-time synchronization of doctor-written digital prescriptions with Booking Details, non-UUID booking ID safety, customer fallback querying, and end-session prefilling.', status: 'idle' },
+    { id: 'TC-106', name: 'Checkout Default Zero Payment & Unpaid Status Preservation Engine', category: 'Finance & Accounting', endpoint: '/api/reservations', description: 'Verifies that empty amount paid input in checkout defaults to 0 EGP rather than total session price, preserves unpaid payment status, and accurately logs full session balance as remaining debt.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
@@ -10430,7 +10431,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
           const walletDeduction = useWalletBalance ? Math.min(walletBalance, balanceDue) : 0;
           const netDue = Math.max(0, balanceDue - walletDeduction);
 
-          const amountPaidNum = checkoutAmountPaid.trim() !== "" ? (parseFloat(checkoutAmountPaid) || 0) : netDue;
+          const amountPaidNum = checkoutAmountPaid.trim() !== "" ? (parseFloat(checkoutAmountPaid) || 0) : 0;
           const diff = amountPaidNum - netDue;
 
           const changeAmount = diff > 0 ? diff : 0;
@@ -10935,7 +10936,7 @@ export default function AdminPage({ portalRole = 'admin' }: { portalRole?: strin
                           min="0"
                           value={checkoutAmountPaid}
                           onChange={(e) => setCheckoutAmountPaid(e.target.value)}
-                          placeholder={String(netDue)}
+                          placeholder="0"
                           className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white pl-3 pr-10 py-2.5 text-sm font-bold text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)] transition"
                         />
                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[var(--color-brand-secondary)]">EGP</span>

@@ -4305,3 +4305,28 @@ A failure in steps 2 to 5 undoes the earlier steps (figures restored, sessions t
    - Added `tests/components/patients/SettleDebtModal.test.tsx` verifying zero-debt guard, populated sessions list, and direct balance fallback (3 tests passing).
    - Re-verified all 22 tests in `tests/routes/settle-debt.test.ts`.
    - Verified `npm run typecheck` and `npm run build` completed with zero compiler or TypeScript errors across all 45 pages.
+
+---
+
+## DEC-142: Checkout Default Zero Payment & Unpaid Status Preservation
+
+**Date:** 2026-10-31 · **Status:** Done on dev; **no migration** · **Related:** DEC-139, DEC-141, TC-104, TC-106
+
+**Context:**
+Previously, in the reception checkout modal (`src/app/admin/page.tsx`), the Amount Paid input fell back to the total net due when empty (`checkoutAmountPaid.trim() !== "" ? parseFloat(checkoutAmountPaid) : netDue`), with placeholder showing `netDue`. If reception confirmed checkout without typing a number, the session was marked as fully paid (`amountLeft: 0`, `amountPaid: netDue`). If no actual payment was collected at reception checkout, the booking was inaccurately marked as paid in full.
+
+**Decision & Implementation:**
+1. **Default Amount Paid to 0 EGP**:
+   - In `src/app/admin/page.tsx`, updated calculation so that an empty Amount Paid input evaluates to `0` rather than `netDue`:
+     `const amountPaidNum = checkoutAmountPaid.trim() !== "" ? (parseFloat(checkoutAmountPaid) || 0) : 0;`
+   - Updated input placeholder to `"0"`.
+   - Receptionists wishing to collect the full amount can either click the convenient `"Pay Full (X EGP)"` button or type the amount explicitly.
+2. **Payment Status Preservation**:
+   - When 0 EGP is paid at checkout, `amountPaid` remains 0 (or previous deposit), and `amountLeft` retains the full net due.
+   - The booking's payment status correctly evaluates to `"Unpaid"` (or `"Partially Paid"` if a deposit was already paid).
+   - The session balance is added to the patient's outstanding ledger, and the "Pay & Settle Invoice" button remains available in Booking Details for future settlement.
+3. **Automated Verification & System Test Suite**:
+   - Added `TC-106` ("Checkout Default Zero Payment & Unpaid Status Preservation Engine") to Admin Settings System Test Suite (`INITIAL_SYSTEM_TEST_SUITES`).
+   - Added automated test in `tests/routes/checkout-invoice-safety.test.ts` verifying that checkout with 0 amount paid retains `amount_left: netDue`, inserts 0 payments rows, updates customer outstanding debt, and preserves unpaid status.
+   - Verified with `npx vitest run tests/routes/checkout-invoice-safety.test.ts` (all 22 tests passing).
+   - Verified `npm run typecheck` and `npm run build` (all 45 pages compiled cleanly with 0 errors).

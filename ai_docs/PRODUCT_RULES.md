@@ -302,7 +302,7 @@ The following are **not currently enforced in code**:
      - **Total Price**: Total cost for the session services and add-ons (`cost EGP`).
      - **Session Paid**: Actual amount paid so far for this specific session (`amountPaid EGP`).
      - **Session Outstanding**: Remaining balance owed for this specific session (`amountLeft EGP` / `cost - amountPaid EGP`).
-    - Upon completing payment settlement checkout, Session Paid is updated to total price, Session Outstanding drops to 0 EGP, Customer Total Spent increases by settled payment, and Customer Outstanding is reduced by settled amount.
+    - Upon completing payment settlement checkout, if an amount was entered or 'Pay Full' was clicked, Session Paid is updated with the payment, Session Outstanding is reduced, Customer Total Spent increases by settled payment, and Customer Outstanding is reduced by settled amount. If the Amount Paid input was left blank (defaulting to 0 EGP), 0 EGP is collected, the full net due remains as Session Outstanding (`amount_left`), and payment status remains 'Unpaid' (or 'Partially Paid' if a deposit was previously paid).
 
 6. **Reception Follow-Up Reminders & Pre-Filled Booking Engine (`TC-060` & `TC-061`)**:
    - **Doctor Follow-Up Intent**: When completing a session or issuing a digital prescription, doctors record an optional follow-up target date (`follow_up_date`) and clinical instructions (`follow_up_instructions`).
@@ -514,7 +514,7 @@ The following are **not currently enforced in code**:
      - **Total Price**: Total cost for the session services and add-ons (`cost EGP`).
      - **Session Paid**: Actual amount paid so far for this specific session (`amountPaid EGP`).
      - **Session Outstanding**: Remaining balance owed for this specific session (`amountLeft EGP` / `cost - amountPaid EGP`).
-    - Upon completing payment settlement checkout, Session Paid is updated to total price, Session Outstanding drops to 0 EGP, Customer Total Spent increases by settled payment, and Customer Outstanding is reduced by settled amount.
+    - Upon completing payment settlement checkout, if an amount was entered or 'Pay Full' was clicked, Session Paid is updated with the payment, Session Outstanding is reduced, Customer Total Spent increases by settled payment, and Customer Outstanding is reduced by settled amount. If the Amount Paid input was left blank (defaulting to 0 EGP), 0 EGP is collected, the full net due remains as Session Outstanding (`amount_left`), and payment status remains 'Unpaid' (or 'Partially Paid' if a deposit was previously paid).
 
 ---
 

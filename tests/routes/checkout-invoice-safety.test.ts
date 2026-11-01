@@ -453,4 +453,25 @@ describe('GET /api/invoices auto-created invoice', () => {
     expect(fake.rows('invoices')).toHaveLength(1);
     expect(VALID_INVOICE_STATUSES).toContain(fake.rows('invoices')[0].status);
   });
+
+  it('checkout with 0 amount paid leaves the reservation unpaid with no payment row and logs remaining debt', async () => {
+    fake.seed('reservations', [baseReservation({ status: 'started', amount_paid: 0, amount_left: null })]);
+
+    const res = await PATCH(patchReq({ status: 'completed', amountPaid: 0, amountLeft: 500 }));
+    expect(res.status).toBe(200);
+
+    const updatedRes = fake.rows('reservations').find((r) => r.id === RES_ID);
+    expect(updatedRes.status).toBe('completed');
+    expect(updatedRes.amount_paid).toBe(0);
+    expect(updatedRes.amount_left).toBe(500);
+
+    const invoices = fake.rows('invoices').filter((i) => i.reservation_id === RES_ID);
+    expect(invoices).toHaveLength(1);
+    expect(invoices[0].grand_total).toBe(500);
+    expect(fake.rows('payments').filter((p) => p.invoice_id === invoices[0].id)).toHaveLength(0);
+
+    const customer = fake.rows('customers').find((c) => c.id === CUSTOMER_ID);
+    expect(customer.outstanding).toBe(500);
+    expect(customer.spent_amount).toBe(0);
+  });
 });
