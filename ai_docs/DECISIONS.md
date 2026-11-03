@@ -4352,3 +4352,24 @@ When reception created a historical booking (`POST /api/reservations/previous`),
 4. **Automated Verification**:
    - Updated `tests/routes/reservations-previous-invoice.test.ts` to assert that `transactions[0].reference_no === 'INV-000100'`, `transactions[0].invoice_id === inv.id`, and `payments[0].reference === 'INV-000100'`.
    - Verified that all 17 tests in `tests/routes/reservations-previous-invoice.test.ts` pass cleanly.
+
+---
+
+## DEC-144: Historical Transaction UUID Leakage Elimination & Reservation Invoice Resolution
+
+**Date:** 2026-11-03 · **Status:** Done on dev; **no migration** · **Related:** DEC-143, DEC-103, RISK-076
+
+**Context:**
+Clinic staff observed that existing historical booking transactions displayed raw 36-character database UUIDs (e.g., `410ce7f5-7483-488f-9d4a-7823c4680291`) in the Reference column of the Transactions list (`TransactionsView.tsx`) and the Patient Transactions History tab (`PatientTransactionsHistoryTab.tsx`). This occurred because:
+1. Both UI components used the fallback `{tx.reference_no || tx.invoice_no || tx.reservation_id || "—"}`, outputting the internal `reservation_id` UUID whenever `reference_no` was empty.
+2. In `GET /api/transactions`, the query joined `invoices` solely on `transactions.invoice_id`. For pre-DEC-143 historical booking transactions where `invoice_id` was `null`, `invoice_no` was returned as `null`, causing the UI to fall back to the raw reservation UUID.
+
+**Decision & Implementation:**
+1. **Dynamic Invoice Resolution via `reservation_id`**:
+   - In `src/app/api/transactions/route.ts`, added resolution for transactions where `invoice_id` is null or `reference_no` is a UUID: queries `invoices` matching `reservation_id` to resolve the authoritative `invoice_no` (`INV-NNNNNN`).
+   - Automatically repairs the transaction row in the database in the background (`reference_no: inv.invoice_no, invoice_id: inv.id`).
+2. **UUID Display Fallback Elimination**:
+   - In `TransactionsView.tsx` (line 763) and `PatientTransactionsHistoryTab.tsx` (line 445), removed `|| tx.reservation_id` from the reference cell, ensuring only standard references or "—" are displayed.
+   - In `TransactionDetailsModal.tsx`, updated the reference section to check `(transaction.reference_no || transaction.invoice_no)` so the invoice reference is always displayed.
+3. **Automated Verification**:
+   - Added test suite to `tests/routes/transactions.test.ts` verifying that `GET /api/transactions` resolves missing `reference_no` and `invoice_no` from `invoices` via `reservation_id`, and replaces raw UUID values with `INV-NNNNNN` (all 63 tests pass).

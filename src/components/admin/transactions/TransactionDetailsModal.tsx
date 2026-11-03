@@ -175,10 +175,10 @@ export const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = (
             <p className="text-xs font-medium text-gray-800 leading-relaxed">
               {transaction.description || (isAr ? "لا يوجد وصف مدون." : "No description provided.")}
             </p>
-            {transaction.reference_no && (
+            {(transaction.reference_no || transaction.invoice_no) && (
               <div className="pt-2 border-t border-gray-100 flex items-center gap-2 text-xs">
                 <span className="text-gray-400 font-bold">{isAr ? "المرجع / الإيصال:" : "Reference / Receipt:"}</span>
-                <span className="font-mono text-gray-700 font-semibold">{transaction.reference_no}</span>
+                <span className="font-mono text-gray-700 font-semibold">{transaction.reference_no || transaction.invoice_no}</span>
               </div>
             )}
             {transaction.reason && (

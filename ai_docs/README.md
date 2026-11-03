@@ -1,6 +1,6 @@
 # ai_docs — Revera Clinics Agent Knowledge Base
 
-> **Last Updated:** 2026-11-01 (DEC-143: Previous Booking Transaction Reference Alignment INV-NNNNNN)
+> **Last Updated:** 2026-11-03 (DEC-144: Historical Transaction UUID Leakage Elimination & Reservation Invoice Resolution)
 > **Branch:** dev (these docs do not belong on main/production)
 > **Maintained by:** Project manager. Updated whenever architecture, decisions, or risks change.
 

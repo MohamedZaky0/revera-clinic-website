@@ -760,7 +760,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                       {/* Reference */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <span className="font-mono text-[11px] text-gray-500">
-                          {tx.reference_no || tx.invoice_no || tx.reservation_id || "—"}
+                          {tx.reference_no || tx.invoice_no || "—"}
                         </span>
                       </td>
 

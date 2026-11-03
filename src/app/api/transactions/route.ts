@@ -149,25 +149,72 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Failed to fetch transactions.' }, { status: 500 });
     }
 
-    let items = (rawTxns || []).map((t: any) => ({
-      ...t,
-      invoice_no: t.invoice?.invoice_no || null,
-      customer: t.customer ? {
-        id: t.customer.id,
-        name: t.customer.name,
-        // `customers` stores the number in `mobile`; exposed as `phone` so the client-facing
-        // TransactionCustomer shape stays stable.
-        phone: t.customer.mobile,
-        wallet_balance: Number(t.customer.wallet_balance || 0),
-        outstanding: Number(t.customer.outstanding || 0),
-        spent: Number(t.customer.spent_amount || 0),
-      } : null,
-      branch: t.branch ? {
-        id: t.branch.id,
-        name_en: t.branch.name_en,
-        name_ar: t.branch.name_ar,
-      } : null,
-    }));
+    const isUuid = (val?: string | null) =>
+      Boolean(val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(val).trim()));
+
+    // Resolve missing invoice numbers via reservation_id for transactions whose invoice_id was not directly linked
+    const needsInvoiceLookup = (rawTxns || []).filter(
+      (t: any) => (!t.invoice?.invoice_no || !t.reference_no || isUuid(t.reference_no)) && t.reservation_id
+    );
+    const resInvoiceMap = new Map<string, { id: string; invoice_no: string }>();
+    if (needsInvoiceLookup.length > 0) {
+      const resIds = Array.from(new Set(needsInvoiceLookup.map((t: any) => t.reservation_id).filter(Boolean)));
+      if (resIds.length > 0) {
+        const { data: invRows } = await supabaseServer
+          .from('invoices')
+          .select('id, reservation_id, invoice_no')
+          .in('reservation_id', resIds);
+        if (invRows) {
+          for (const inv of invRows) {
+            if (inv.reservation_id && inv.invoice_no) {
+              resInvoiceMap.set(inv.reservation_id, { id: inv.id, invoice_no: inv.invoice_no });
+            }
+          }
+        }
+      }
+
+      // Asynchronously repair transaction records missing reference_no or invoice_id in the database
+      for (const t of needsInvoiceLookup) {
+        const inv = resInvoiceMap.get(t.reservation_id);
+        if (inv && (t.reference_no !== inv.invoice_no || t.invoice_id !== inv.id)) {
+          supabaseServer
+            .from('transactions')
+            .update({ reference_no: inv.invoice_no, invoice_id: inv.id })
+            .eq('id', t.id)
+            .then(() => {})
+            .catch(() => {});
+        }
+      }
+    }
+
+    let items = (rawTxns || []).map((t: any) => {
+      const linkedInv = t.reservation_id ? resInvoiceMap.get(t.reservation_id) : null;
+      const resolvedInvNo = t.invoice?.invoice_no || linkedInv?.invoice_no || null;
+      const resolvedInvoiceId = t.invoice_id || linkedInv?.id || null;
+      const refNo = (t.reference_no && !isUuid(t.reference_no))
+        ? t.reference_no
+        : (resolvedInvNo || null);
+
+      return {
+        ...t,
+        invoice_id: resolvedInvoiceId,
+        invoice_no: resolvedInvNo,
+        reference_no: refNo,
+        customer: t.customer ? {
+          id: t.customer.id,
+          name: t.customer.name,
+          phone: t.customer.mobile,
+          wallet_balance: Number(t.customer.wallet_balance || 0),
+          outstanding: Number(t.customer.outstanding || 0),
+          spent: Number(t.customer.spent_amount || 0),
+        } : null,
+        branch: t.branch ? {
+          id: t.branch.id,
+          name_en: t.branch.name_en,
+          name_ar: t.branch.name_ar,
+        } : null,
+      };
+    });
 
     // Client-side search filtering (for joined customer name/phone, description, ref, or reservation)
     if (search) {

@@ -693,3 +693,63 @@ describe('POST — blank reference_no gets an RCT- receipt number', () => {
     expect(fake.rows('transactions')[0].reference_no).toBe('PAPER-77');
   });
 });
+
+describe('GET — reference_no and invoice_no resolution for historical / reservation transactions', () => {
+  beforeEach(() => {
+    seedStaffAuth('superadmin', []);
+    fake.seed('customers', [{ id: CUSTOMER_ID, wallet_balance: 0, outstanding: 0, spent_amount: 0 }]);
+  });
+
+  it('resolves missing reference_no from invoices table via reservation_id', async () => {
+    const resId = '410ce7f5-7483-488f-9d4a-7823c4680291';
+    fake.seed('invoices', [{ id: 'inv-45', reservation_id: resId, invoice_no: 'INV-000045' }]);
+    fake.seed('transactions', [
+      {
+        id: 't-hist-1',
+        transaction_id: 'TXN-000100',
+        type: 'payment',
+        amount: 500,
+        status: 'completed',
+        customer_id: CUSTOMER_ID,
+        reservation_id: resId,
+        invoice_id: null,
+        reference_no: null,
+        occurred_at: '2026-10-27T12:00:00Z',
+      },
+    ]);
+
+    const res = await GET(staffReq('GET'));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const tx = body.transactions.find((t: any) => t.id === 't-hist-1');
+    expect(tx.reference_no).toBe('INV-000045');
+    expect(tx.invoice_no).toBe('INV-000045');
+  });
+
+  it('replaces a raw UUID stored in reference_no with the resolved INV-NNNNNN', async () => {
+    const resId = '2c384c26-68e4-4fd6-a7f7-4b6c246d851f';
+    fake.seed('invoices', [{ id: 'inv-46', reservation_id: resId, invoice_no: 'INV-000046' }]);
+    fake.seed('transactions', [
+      {
+        id: 't-hist-2',
+        transaction_id: 'TXN-000101',
+        type: 'payment',
+        amount: 300,
+        status: 'completed',
+        customer_id: CUSTOMER_ID,
+        reservation_id: resId,
+        invoice_id: null,
+        reference_no: resId, // raw UUID erroneously stored
+        occurred_at: '2026-10-27T12:00:00Z',
+      },
+    ]);
+
+    const res = await GET(staffReq('GET'));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const tx = body.transactions.find((t: any) => t.id === 't-hist-2');
+    expect(tx.reference_no).toBe('INV-000046');
+    expect(tx.invoice_no).toBe('INV-000046');
+  });
+});
+
