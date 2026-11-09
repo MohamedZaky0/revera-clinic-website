@@ -14,6 +14,8 @@ A modern, bilingual (English/Arabic with RTL support) medical clinic website bui
 
 ## Prerequisites
 
+ggggggggggg
+
 - **Node.js >= 24** — check your version with `node --version`
   - Use [nvm](https://github.com/nvm-sh/nvm) or [nvm-windows](https://github.com/coreybutler/nvm-windows): `nvm use` (reads `.nvmrc` automatically)
 
@@ -83,3 +85,5 @@ Language switching is built-in. The `LanguageContext` provides the current langu
 ## Deployment
 
 The project is configured for Vercel deployment with `output: "standalone"` in `next.config.ts`. Push to GitHub and import the repo in [vercel.com](https://vercel.com) — no extra configuration needed.
+
+Branch workflow: `dev` branch is used for development and staging; verified builds are merged to `main`.
